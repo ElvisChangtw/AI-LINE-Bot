@@ -1,0 +1,33 @@
+line:
+  bot:
+    channel-token: ${LINE_CHANNEL_TOKEN}
+    channel-secret: ${LINE_CHANNEL_SECRET}
+    handler:
+      path: /callback
+
+# 2) Spring AI / OpenAI
+spring:
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      http:
+        connect-timeout: 100s
+        read-timeout: 120s
+      chat:
+        options:
+          model: ${OPEN_AI_MODEL}
+          temperature: ${OPEN_AI_TEMPERATURE}
+      image:
+        options:
+          model: dall-e-3
+          size: 1024x1024
+          quality: standard
+    retry:
+      max-attempts: 3
+      backoff:
+        initial-interval: 2s
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
