@@ -1,9 +1,6 @@
 package com.elvischang.ailinebot.service;
 
 import com.elvischang.ailinebot.helper.LineCommandFactory;
-import com.linecorp.bot.messaging.client.MessagingApiClient;
-import com.linecorp.bot.messaging.model.ReplyMessageRequest;
-import com.linecorp.bot.messaging.model.TextMessage;
 import com.linecorp.bot.webhook.model.*;
 import io.micrometer.common.util.StringUtils;
 import org.springframework.stereotype.Service;

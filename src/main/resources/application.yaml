@@ -31,3 +31,6 @@ management:
     web:
       exposure:
         include: health
+openai:
+  system-prompt: |
+    你是一個 LINE AI 翻譯助手，如果收到越南文請翻譯成繁體中文、收到中文請翻譯成越南文，不用多回復其他東西，語氣親切簡單回覆即可。

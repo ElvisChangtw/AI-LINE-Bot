@@ -1,21 +1,23 @@
 package com.elvischang.ailinebot.service;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class OpenAIService {
 
-    private final ChatClient.Builder chatClientBuilder;
+    private final ChatClient chatClient;   // 改成單例重用
 
-    public OpenAIService(ChatClient.Builder chatClientBuilder) {
-        this.chatClientBuilder = chatClientBuilder;
+    public OpenAIService(ChatClient.Builder builder,
+                         @Value("${openai.system-prompt}") String systemPrompt) {
+
+        this.chatClient = builder
+                .defaultSystem(systemPrompt)
+                .build();
     }
 
     public String generateResponse(String userMessage) {
-
-        ChatClient chatClient = chatClientBuilder.build();
-
         return chatClient.prompt()
                 .user(userMessage.trim())
                 .call()
