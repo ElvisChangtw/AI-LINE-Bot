@@ -1,18 +1,28 @@
 package com.elvischang.ailinebot.service;
 
 import com.elvischang.ailinebot.helper.LineCommandFactory;
+import com.linecorp.bot.client.base.BlobContent;
+import com.linecorp.bot.messaging.client.MessagingApiBlobClient;
 import com.linecorp.bot.webhook.model.*;
 import io.micrometer.common.util.StringUtils;
+import org.apache.logging.log4j.util.Strings;
+import org.springframework.ai.audio.transcription.AudioTranscriptionPrompt;
+import org.springframework.ai.openai.OpenAiAudioTranscriptionModel;
 import org.springframework.stereotype.Service;
 
+import java.io.InputStream;
 import java.util.*;
 
 @Service
 public class LineMessageService {
     private final LineCommandFactory lineCommandFactory;
+    private final MessagingApiBlobClient messagingApiBlobClient;
+    private final WhisperService whisperService;
 
-    public LineMessageService(LineCommandFactory lineCommandFactory) {
+    public LineMessageService(LineCommandFactory lineCommandFactory, MessagingApiBlobClient messagingApiBlobClient, WhisperService whisperService) {
         this.lineCommandFactory = lineCommandFactory;
+        this.messagingApiBlobClient = messagingApiBlobClient;
+        this.whisperService = whisperService;
     }
 
     private static final int CACHE_LIMIT = 1000;
@@ -53,6 +63,21 @@ public class LineMessageService {
         lineCommandFactory.resolve(userText).handle(event, prompt);
     }
 
+    public void handleAudioMessage(MessageEvent event) {
+
+        try (InputStream in = messagingApiBlobClient.getMessageContent(event.message().id())
+                .get().body().byteStream()) {
+
+            byte[] audioBytes = in.readAllBytes();
+
+            String text = whisperService.speechToText(audioBytes);
+            String prompt = buildPrompt(text, Strings.EMPTY);
+            lineCommandFactory.resolve(text).handle(event, prompt);
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("抱歉，語音翻譯失敗，請稍後再試！");
+        }
+    }
 
     private String buildPrompt(String userText, String quotedText) {
         if (StringUtils.isBlank(quotedText)) {
@@ -71,4 +96,5 @@ public class LineMessageService {
 
         return sb.toString().trim();
     }
+
 }

@@ -26,6 +26,8 @@ public class LineBotController {
             if (event instanceof MessageEvent messageEvent){
                 if( messageEvent.message() instanceof TextMessageContent) {
                     lineMessageService.handleTextMessage(messageEvent);
+                } else if (messageEvent.message() instanceof AudioMessageContent) {
+                    lineMessageService.handleAudioMessage(messageEvent);
                 }
             }
         }
