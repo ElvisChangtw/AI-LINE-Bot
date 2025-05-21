@@ -1,12 +1,10 @@
 package com.elvischang.ailinebot.service;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.ai.audio.transcription.AudioTranscriptionPrompt;
 import org.springframework.ai.audio.transcription.AudioTranscriptionResponse;
 import org.springframework.ai.openai.OpenAiAudioTranscriptionModel;
 import org.springframework.ai.openai.OpenAiAudioTranscriptionOptions;
 import org.springframework.ai.openai.api.OpenAiAudioApi;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -14,7 +12,6 @@ import ws.schild.jave.MultimediaObject;
 import ws.schild.jave.encode.AudioAttributes;
 import ws.schild.jave.encode.EncodingAttributes;
 import ws.schild.jave.Encoder;
-import javax.sound.sampled.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,7 +32,6 @@ public class WhisperService {
         Path outputFile = Files.createTempFile("output-", ".mp3");
 
         try {
-            // 設置音頻屬性
             AudioAttributes audio = new AudioAttributes();
             audio.setCodec("libmp3lame");
             audio.setBitRate(128000);

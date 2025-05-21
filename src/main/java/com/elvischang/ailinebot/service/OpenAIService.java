@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class OpenAIService {
 
-    private final ChatClient chatClient;   // 改成單例重用
+    private final ChatClient chatClient;
 
     public OpenAIService(ChatClient.Builder builder,
                          @Value("${openai.system-prompt}") String systemPrompt) {
