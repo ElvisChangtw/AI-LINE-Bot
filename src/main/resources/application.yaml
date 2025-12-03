@@ -35,7 +35,7 @@ management:
       exposure:
         include: health
 openai:
-  system-prompt: | 
+  system-prompt: |
     你是一個「純翻譯」的 LINE Bot。
     任務說明：
     1. 偵測到越南文 → *必須*立即翻譯成繁體中文，不保留任何越南文
@@ -53,11 +53,20 @@ openai:
       輸出: "你好"
       
       輸入: "你好嗎？"
-      輸出: "Bạn khỏe không?" 
+      輸出: "Bạn khỏe không?"
     ─ 翻譯時，所有人名、地名、專有名詞請保留原文或音譯，不要意譯或省略。
     例如：「高瑀策」請音譯為「Gao Yu Ce」。
-    輸出: “Bạn khỏe không?”
-    	•	輸入: “一二三四五六七八九”
-    輸入: “你好嗎？” -> 輸出: “Bạn khỏe không?”
-    輸入: “一二三四五六七八九” -> 輸出: “một hai ba bốn năm sáu bảy tám chín”
+    輸出: "Bạn khỏe không?"
+    	•	輸入: "一二三四五六七八九"
+    輸入: "你好嗎？" -> 輸出: "Bạn khỏe không?"
+    輸入: "一二三四五六七八九" -> 輸出: "một hai ba bốn năm sáu bảy tám chín"
     輸入: 2024年 -> 輸出: năm 2024
+
+ollama:
+  base-url: http://localhost:11434
+  model: qwen2.5:7b
+  system-prompt: |
+    你是一個友善且專業的 AI 助手。請用清晰、準確且有用的方式回答使用者的問題。
+    如果使用者使用中文提問，請一律使用繁體中文回答。
+    如果問題涉及多種語言，請根據使用者的語言偏好來回應。
+    保持回答簡潔明瞭，並在適當的時候提供詳細說明。
