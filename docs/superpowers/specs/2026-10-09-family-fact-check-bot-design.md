@@ -145,10 +145,10 @@ CREATE TABLE material (
 
 CREATE TABLE job (
   id                TEXT PRIMARY KEY,     -- UUID
-  kind              TEXT NOT NULL,        -- FACT_CHECK | IMAGINE
+  kind              TEXT NOT NULL,        -- FACT_CHECK | IMAGINE | NOTICE（固定文字）| DELIVERY（搭載待送結果，自己沒內容）
   group_id          TEXT NOT NULL,
   trigger_message_id TEXT NOT NULL,
-  quoted_message_id TEXT,
+  material_message_id TEXT,               -- 要查證的素材，ingest 時就決定
   user_question     TEXT,
   reply_token       TEXT,
   quote_token       TEXT,                 -- 觸發訊息的 quoteToken，延遲送出時用來引用原問題
@@ -159,7 +159,7 @@ CREATE TABLE job (
   lease_until       INTEGER,
   result_text       TEXT,                 -- 送出前先存，重跑時不用再呼叫模型
   send_state        TEXT NOT NULL DEFAULT 'NOT_SENT',
-                    -- NOT_SENT | SENDING_REPLY | REPLIED | WAITING_NEXT | UNKNOWN | EXPIRED
+                    -- NOT_SENT | CARRIED | SENDING_REPLY | REPLIED | WAITING_NEXT | UNKNOWN | EXPIRED | NOTHING_TO_SEND
   verdict           TEXT,
   error_code        TEXT,
   input_tokens      INTEGER,
@@ -191,11 +191,11 @@ claim（一個 SQL 原子完成，SQLite 單一 writer 保證不會兩邊同時�
 
 ```sql
 UPDATE job SET status='RUNNING', attempts=attempts+1, lease_until=:now+:lease
-WHERE id=:id AND status='PENDING'
-  AND NOT EXISTS (SELECT 1 FROM job j WHERE j.group_id=job.group_id AND j.status='RUNNING');
+WHERE id=:id AND status='PENDING';
 ```
 
-- 更新 0 列，代表別人已經在做，或同群組有工作正在跑：留在 PENDING。同群組的工作做完後，主動派發該群組下一筆 PENDING。
+- 更新 0 列，代表別人已經在做：直接跳過。
+- 不限制「同群組一次只跑一件」：job 之間沒有共用可寫的 context，唯一的共享寫入（認領待送結果）本身是原子的。為了讓答案順序錯開時也看得懂，每則結果都用 `quoteToken` 引用觸發的那則 @ 訊息。（2026-10-09 寫實作計畫時修訂）
 - executor：`jobExecutor` 2 條 thread、queue 50；`mediaExecutor` 1 條 thread、queue 100。queue 滿了不丟資料，交給補救掃描處理。
 - lease 3 分鐘。超過 lease 的 RUNNING：`send_state = NOT_SENT` 就放回 PENDING；`attempts ≥ 3` 就標 FAILED。
 - 結果先寫進 `result_text` 再送出。重跑時有結果就直接送，不再呼叫模型。
