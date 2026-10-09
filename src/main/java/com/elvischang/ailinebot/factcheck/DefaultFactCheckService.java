@@ -52,6 +52,10 @@ public class DefaultFactCheckService implements FactCheckService {
             return FactCheckReply.notice(material.mediaStatus() == MediaStatus.PENDING
                     ? BotReplies.IMAGE_NOT_READY : BotReplies.IMAGE_GONE);
         }
+        // Without a hash every such image would share one cache key.
+        if (material.kind() == MaterialKind.IMAGE && (material.mediaSha256() == null || material.mediaSha256().isBlank())) {
+            return FactCheckReply.notice(BotReplies.IMAGE_GONE);
+        }
         String text = material.kind() == MaterialKind.IMAGE ? null : material.text();
         byte[] image = material.kind() == MaterialKind.IMAGE ? readImage(material) : null;
         if (material.kind() == MaterialKind.IMAGE && image == null) {

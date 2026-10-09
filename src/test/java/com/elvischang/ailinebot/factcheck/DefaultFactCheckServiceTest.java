@@ -7,12 +7,15 @@ import com.elvischang.ailinebot.store.MaterialKind;
 import com.elvischang.ailinebot.store.MaterialRepository;
 import com.elvischang.ailinebot.store.MediaStatus;
 import com.elvischang.ailinebot.support.IntegrationTestSupport;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
 
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -39,6 +42,15 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
 
     @Autowired
     SpendRepository spendRepository;
+
+    @Autowired
+    VerificationCacheRepository cache;
+
+    @Autowired
+    UsageGuard usageGuard;
+
+    @Autowired
+    FactCheckProperties props;
 
     private static final FactCheckResult RESULT = new FactCheckResult(Verdict.INCORRECT, false, "舊謠言",
             List.of(new FactCheckResult.Claim("c", Verdict.INCORRECT, "按 1 不會讓手機被控制")), true,
@@ -68,6 +80,67 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
         assertThat(second.text()).isEqualTo(first.text());
         assertThat(second.costMicroUsd()).isZero();
         verify(checker, times(1)).check(any());
+    }
+
+    private final List<Path> writtenFiles = new ArrayList<>();
+
+    @AfterEach
+    void deleteWrittenFiles() throws Exception {
+        for (Path file : writtenFiles) {
+            Files.deleteIfExists(file);
+        }
+    }
+
+    private Material storedImage(String id, String sha) throws Exception {
+        long now = clock.millis();
+        Material m = new Material("Cg1", id, MaterialKind.IMAGE, null, false, MediaStatus.STORED, sha, 0, now, now + 1_000_000);
+        materials.insert(m);
+        var file = mediaStore.pathFor("Cg1", id);
+        Files.createDirectories(file.getParent());
+        Files.write(file, new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, (byte) id.hashCode()});
+        writtenFiles.add(file);
+        return m;
+    }
+
+    private void answerWithResult() {
+        when(checker.check(any())).thenReturn(new ModelCheck(RESULT, Set.of("https://tfc-taiwan.org.tw/?p=108215"), Usage.NONE));
+    }
+
+    @Test
+    void differentImagesAndATextMatchingAnImageShaNeverShareACacheEntry() throws Exception {
+        answerWithResult();
+
+        service.verify(storedImage("401", "sha401"), "真的嗎");
+        service.verify(storedImage("402", "sha402"), "真的嗎");
+        service.verify(storedImage("403", "x"), "真的嗎");
+        service.verify(text("Cg1", "404", "x"), "真的嗎");
+
+        verify(checker, times(4)).check(any());
+    }
+
+    @Test
+    void anotherModelDoesNotReuseTheCachedAnswer() {
+        answerWithResult();
+        FactCheckProperties otherModel = new FactCheckProperties(props.baseUrl(), props.apiKey(), "other-model",
+                props.reasoningEffort(), props.maxToolCalls(), props.requestTimeout(), props.inputMicroUsdPerMillion(),
+                props.outputMicroUsdPerMillion(), props.searchMicroUsdPerCall(), props.dailyLimitMicroUsd(),
+                props.monthlyLimitMicroUsd(), props.cacheTtl(), props.promptVersion());
+        DefaultFactCheckService otherService = new DefaultFactCheckService(checker, cache, usageGuard, mediaStore, otherModel, clock);
+
+        service.verify(text("Cg1", "1", "按1 手機被屏蔽"), "真的嗎");
+        otherService.verify(text("Cg2", "2", "按1 手機被屏蔽"), "真的嗎");
+
+        verify(checker, times(2)).check(any());
+    }
+
+    @Test
+    void storedImageWithoutAHashIsTreatedAsGone() throws Exception {
+        answerWithResult();
+
+        assertThat(service.verify(storedImage("405", null), "真的嗎").text()).isEqualTo(BotReplies.IMAGE_GONE);
+        assertThat(service.verify(storedImage("406", " "), "真的嗎").text()).isEqualTo(BotReplies.IMAGE_GONE);
+
+        verify(checker, never()).check(any());
     }
 
     @Test
