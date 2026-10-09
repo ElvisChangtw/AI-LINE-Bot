@@ -6,6 +6,7 @@ import com.elvischang.ailinebot.store.Material;
 import com.elvischang.ailinebot.store.MaterialRepository;
 import com.elvischang.ailinebot.store.MediaStatus;
 import com.linecorp.bot.client.base.BlobContent;
+import com.linecorp.bot.client.base.Result;
 import com.linecorp.bot.messaging.client.MessagingApiBlobClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +25,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 
 @Component
@@ -51,8 +54,14 @@ public class MediaStore {
         }
         Path target = pathFor(groupId, messageId);
         try {
-            BlobContent content = blobClient.getMessageContent(messageId)
-                    .get(props.mediaDownloadTimeout().toMillis(), TimeUnit.MILLISECONDS).body();
+            CompletableFuture<Result<BlobContent>> future = blobClient.getMessageContent(messageId);
+            BlobContent content;
+            try {
+                content = future.get(props.mediaDownloadTimeout().toMillis(), TimeUnit.MILLISECONDS).body();
+            } catch (TimeoutException e) {
+                future.cancel(true);
+                throw e;
+            }
             String sha256 = writeLimited(content, target);
             materials.markMedia(groupId, messageId, MediaStatus.STORED, sha256);
         } catch (MediaTooLargeException e) {
