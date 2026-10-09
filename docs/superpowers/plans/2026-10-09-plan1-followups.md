@@ -39,9 +39,9 @@ Plan 1（地基）已完成：branch `feat/fact-check-bot`，`mvn clean test` 98
 - `quoteToken` 的有效期，以及帶了失效 quoteToken 的 reply 是否回 400 且不消耗 token
 - 一次 reply 多則訊息時，長輩實際看到的順序與呈現
 
-## 需要使用者決定
+## 使用者已決定
 
-- 規則 3（沒引用時找最近 10 分鐘內唯一的候選）要不要排除語音和影片？目前會算進去，所以「轉貼文字＋語音」之後 @bot 會回「有好幾則」。reviewer 建議排除。
+- 2026-10-09：規則 3（沒引用時找最近 10 分鐘內唯一的候選）維持現狀，語音和影片照樣算進候選，不排除。「轉貼文字＋語音」之後 @bot，會回「有好幾則，請引用」。日後要改，只需要在 `MaterialRepository.recentCandidates` 的 SQL 排除 AUDIO 和 VIDEO。
 
 ## 已知、可以接受的限制
 
