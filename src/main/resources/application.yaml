@@ -64,3 +64,17 @@ management:
     web:
       exposure:
         include: health
+factcheck:
+  base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+  api-key: ${OPENAI_API_KEY}
+  model: gpt-6-luna
+  reasoning-effort: medium
+  max-tool-calls: 3
+  request-timeout: 40s
+  input-micro-usd-per-million: 100000
+  output-micro-usd-per-million: 500000
+  search-micro-usd-per-call: 10000
+  daily-limit-micro-usd: 2000000
+  monthly-limit-micro-usd: 40000000
+  cache-ttl: 24h
+  prompt-version: v1

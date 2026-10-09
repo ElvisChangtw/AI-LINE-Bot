@@ -1,0 +1,3 @@
+package com.elvischang.ailinebot.factcheck;
+
+public enum Verdict { CORRECT, INCORRECT, PARTLY_CORRECT, OUTDATED_OR_MISSING_CONDITIONS, INSUFFICIENT_EVIDENCE, OPINION }

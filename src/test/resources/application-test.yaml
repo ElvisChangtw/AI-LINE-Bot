@@ -20,3 +20,5 @@ bot:
   media-max-attempts: 2
   job-max-attempts: 2
   scheduling-enabled: false
+factcheck:
+  api-key: test-key

@@ -1,0 +1,44 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["overall_verdict", "political", "headline", "claims", "safety_tip", "sources"],
+  "properties": {
+    "overall_verdict": {
+      "type": "string",
+      "enum": ["CORRECT", "INCORRECT", "PARTLY_CORRECT", "OUTDATED_OR_MISSING_CONDITIONS", "INSUFFICIENT_EVIDENCE", "OPINION"]
+    },
+    "political": { "type": "boolean" },
+    "headline": { "type": "string" },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "verdict", "reason"],
+        "properties": {
+          "text": { "type": "string" },
+          "verdict": {
+            "type": "string",
+            "enum": ["CORRECT", "INCORRECT", "PARTLY_CORRECT", "OUTDATED_OR_MISSING_CONDITIONS", "INSUFFICIENT_EVIDENCE", "OPINION"]
+          },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "safety_tip": { "type": "boolean" },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["url", "title", "publisher", "published_date"],
+        "properties": {
+          "url": { "type": "string" },
+          "title": { "type": "string" },
+          "publisher": { "type": "string" },
+          "published_date": { "type": "string" }
+        }
+      }
+    }
+  }
+}

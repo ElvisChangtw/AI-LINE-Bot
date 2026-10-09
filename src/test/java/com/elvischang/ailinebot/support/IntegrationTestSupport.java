@@ -39,6 +39,7 @@ public abstract class IntegrationTestSupport {
     static void lineEndpoints(DynamicPropertyRegistry registry) {
         registry.add("line.bot.api-end-point", () -> LINE.baseUrl() + "/");
         registry.add("line.bot.blob-end-point", () -> LINE.baseUrl() + "/");
+        registry.add("factcheck.base-url", () -> LINE.baseUrl() + "/v1");
     }
 
     @Autowired
