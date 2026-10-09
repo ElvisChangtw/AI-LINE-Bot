@@ -144,6 +144,18 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
     }
 
     @Test
+    void insufficientEvidenceIsNotCached() {
+        when(checker.check(any())).thenReturn(new ModelCheck(RESULT, Set.of(), Usage.NONE));
+
+        FactCheckReply first = service.verify(text("Cg1", "1", "剛出現的新謠言"), "真的嗎");
+        service.verify(text("Cg2", "2", "剛出現的新謠言"), "真的嗎");
+
+        assertThat(first.verdict()).isEqualTo(Verdict.INSUFFICIENT_EVIDENCE);
+        verify(checker, times(2)).check(any());
+        assertThat(jdbc.sql("SELECT COUNT(*) FROM verification_cache").query(Integer.class).single()).isZero();
+    }
+
+    @Test
     void refusesWhenTheBudgetIsSpent() {
         spendRepository.record(clock.millis(), 2_000_000L);
 

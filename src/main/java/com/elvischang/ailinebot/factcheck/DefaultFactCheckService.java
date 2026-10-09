@@ -77,7 +77,10 @@ public class DefaultFactCheckService implements FactCheckService {
         ModelCheck check = checker.check(new FactCheckInput(text, image, image == null ? null : mimeType(image),
                 userQuestion, LocalDate.now(clock.withZone(TAIPEI))));
         FactCheckResult filtered = CitationFilter.apply(check.result(), check.consultedUrls());
-        cache.put(key, filtered, now);
+        // New rumours often get fact-checked hours later, so a "not enough evidence" answer must not stick.
+        if (filtered.overall() != Verdict.INSUFFICIENT_EVIDENCE) {
+            cache.put(key, filtered, now);
+        }
         long cost = check.usage().costMicroUsd(props);
         logOutcome(material, false, filtered.overall(), check.usage(), cost);
         return new FactCheckReply(nonBlank(ReplyFormatter.format(filtered, hasLink)), filtered.overall(), check.usage(), cost);
