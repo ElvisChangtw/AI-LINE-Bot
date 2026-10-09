@@ -2,6 +2,8 @@ line:
   bot:
     channel-token: ${LINE_CHANNEL_TOKEN}
     channel-secret: ${LINE_CHANNEL_SECRET}
+    connect-timeout: 5s
+    read-timeout: 15s
     handler:
       path: /callback
 
