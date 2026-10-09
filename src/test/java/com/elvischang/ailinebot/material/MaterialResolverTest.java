@@ -93,4 +93,10 @@ class MaterialResolverTest extends IntegrationTestSupport {
         assertThat(resolve("/imagine 一隻在台北街頭散步的柴犬穿著雨衣", null))
                 .isEqualTo(new Resolution.Imagine("一隻在台北街頭散步的柴犬穿著雨衣"));
     }
+
+    @Test
+    void bareImagineAsksForAPrompt() {
+        assertThat(resolve("/imagine", null)).isEqualTo(new Resolution.Notice(BotReplies.IMAGINE_NEEDS_PROMPT));
+        assertThat(resolve("/imagine    ", null)).isEqualTo(new Resolution.Notice(BotReplies.IMAGINE_NEEDS_PROMPT));
+    }
 }

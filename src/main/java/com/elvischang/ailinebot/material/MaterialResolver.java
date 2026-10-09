@@ -23,8 +23,9 @@ public class MaterialResolver {
 
     public Resolution resolve(Trigger trigger, long now) {
         String text = trigger.textWithoutMention();
-        if (text.startsWith(IMAGINE_PREFIX)) {
-            return new Resolution.Imagine(text.substring(IMAGINE_PREFIX.length()).trim());
+        if (text.equals(IMAGINE_PREFIX.trim()) || text.startsWith(IMAGINE_PREFIX)) {
+            String prompt = text.length() > IMAGINE_PREFIX.length() ? text.substring(IMAGINE_PREFIX.length()).trim() : "";
+            return prompt.isEmpty() ? new Resolution.Notice(BotReplies.IMAGINE_NEEDS_PROMPT) : new Resolution.Imagine(prompt);
         }
         if (trigger.quotedMessageId() != null) {
             return materials.find(trigger.groupId(), trigger.quotedMessageId())

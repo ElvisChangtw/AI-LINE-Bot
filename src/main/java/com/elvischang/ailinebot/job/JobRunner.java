@@ -22,7 +22,6 @@ import java.util.Optional;
 public class JobRunner {
 
     private static final Logger log = LoggerFactory.getLogger(JobRunner.class);
-    private static final String HIGH_QUALITY_KEYWORD = "高畫質";
 
     private final JobRepository jobs;
     private final MaterialRepository materials;
@@ -98,9 +97,7 @@ public class JobRunner {
     }
 
     private String imagine(String prompt) {
-        String url = prompt.contains(HIGH_QUALITY_KEYWORD)
-                ? imageGenerationService.generateImageWithGptImage1(prompt)
-                : imageGenerationService.generateImage(prompt);
+        String url = imageGenerationService.generateImage(prompt);
         if (url == null || url.isBlank()) {
             throw new IllegalStateException("image generation returned no URL");
         }
