@@ -105,4 +105,50 @@ class JobRepositoryTest extends IntegrationTestSupport {
         assertThat(jobs.deleteOlderThan(101)).isEqualTo(1);
         assertThat(jobs.find(a)).isEmpty();
     }
+
+    @Test
+    void clearContentKeepsWaitingResults() {
+        String a = finished("Cg1", 100);
+        jobs.markWaiting(List.of(a), 100);
+        assertThat(jobs.clearContent(101)).isZero();
+        assertThat(jobs.find(a).orElseThrow().resultText()).isEqualTo("result");
+    }
+
+    @Test
+    void startSendingClaimsTheReplyOnce() {
+        String a = finished("Cg1", 100);
+        assertThat(jobs.startSending(a)).isTrue();
+        assertThat(jobs.startSending(a)).isFalse();
+        assertThat(jobs.find(a).orElseThrow().sendState()).isEqualTo(SendState.SENDING_REPLY);
+    }
+
+    @Test
+    void markWaitingDoesNotReviveRepliedJob() {
+        String a = finished("Cg1", 100);
+        jobs.setSendState(List.of(a), SendState.REPLIED);
+        jobs.markWaiting(List.of(a), 200);
+        assertThat(jobs.find(a).orElseThrow().sendState()).isEqualTo(SendState.REPLIED);
+    }
+
+    @Test
+    void releaseAfterCompleteIsNoOp() {
+        String id = jobs.insert(new NewJob(JobKind.FACT_CHECK, "Cg1", "t", "m", "q", "rt", "qt", null), 100);
+        jobs.claim(id, 100, 1000);
+        jobs.complete(id, "result", 100);
+        jobs.release(id, "TIMEOUT");
+        Job job = jobs.find(id).orElseThrow();
+        assertThat(job.status()).isEqualTo(JobStatus.DONE);
+        assertThat(job.errorCode()).isNull();
+    }
+
+    @Test
+    void completeAfterReleaseIsNoOp() {
+        String id = jobs.insert(new NewJob(JobKind.FACT_CHECK, "Cg1", "t", "m", "q", "rt", "qt", null), 100);
+        jobs.claim(id, 100, 1000);
+        jobs.release(id, "TIMEOUT");
+        jobs.complete(id, "late", 200);
+        Job job = jobs.find(id).orElseThrow();
+        assertThat(job.status()).isEqualTo(JobStatus.PENDING);
+        assertThat(job.resultText()).isNull();
+    }
 }

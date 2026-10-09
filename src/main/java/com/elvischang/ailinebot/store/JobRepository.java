@@ -86,7 +86,7 @@ public class JobRepository {
         jdbc.sql("""
                         UPDATE job SET status = 'DONE', result_text = :result, lease_until = NULL,
                                        error_code = NULL, finished_at = :now
-                        WHERE id = :id
+                        WHERE id = :id AND status = 'RUNNING'
                         """)
                 .param("result", resultText)
                 .param("now", now)
@@ -98,7 +98,7 @@ public class JobRepository {
         jdbc.sql("""
                         UPDATE job SET status = 'FAILED', result_text = :result, lease_until = NULL,
                                        error_code = :code, finished_at = :now
-                        WHERE id = :id
+                        WHERE id = :id AND status = 'RUNNING'
                         """)
                 .param("result", resultText)
                 .param("code", errorCode)
@@ -108,7 +108,7 @@ public class JobRepository {
     }
 
     public void release(String id, String errorCode) {
-        jdbc.sql("UPDATE job SET status = 'PENDING', lease_until = NULL, error_code = :code WHERE id = :id")
+        jdbc.sql("UPDATE job SET status = 'PENDING', lease_until = NULL, error_code = :code WHERE id = :id AND status = 'RUNNING'")
                 .param("code", errorCode)
                 .param("id", id)
                 .update();
@@ -176,6 +176,12 @@ public class JobRepository {
                 .list();
     }
 
+    public boolean startSending(String id) {
+        return jdbc.sql("UPDATE job SET send_state = 'SENDING_REPLY' WHERE id = :id AND send_state = 'NOT_SENT'")
+                .param("id", id)
+                .update() == 1;
+    }
+
     public void setSendState(Collection<String> ids, SendState state) {
         if (ids.isEmpty()) {
             return;
@@ -193,7 +199,7 @@ public class JobRepository {
         jdbc.sql("""
                         UPDATE job SET send_state = 'WAITING_NEXT', carrier_job_id = NULL,
                                        waiting_since = COALESCE(waiting_since, :now)
-                        WHERE id IN (:ids)
+                        WHERE id IN (:ids) AND send_state IN ('NOT_SENT', 'SENDING_REPLY', 'CARRIED')
                         """)
                 .param("now", now)
                 .param("ids", ids)
