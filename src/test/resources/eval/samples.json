@@ -1,0 +1,142 @@
+[
+  {
+    "id": "s01",
+    "text": "請大家注意：剛才有人接到電話，問他有沒有接種疫苗。 如果已接種疫苗，請按 1; 如果還沒打過疫苗，按2。 結果按了1，手機被屛蔽了，他常用的PayMe和網上銀行資訊都被轉移了。 這是詐騙的新手法。 請大家一定注意不要上當。 大家積極轉發到各村（社區）和親朋好友群裡，個別社區已有人上當了，請大家當心！ 社區核對有無打疫苗，只會電話詢問，不會要求按數位。",
+    "expected": "INCORRECT",
+    "category": "scam",
+    "source": "https://tfc-taiwan.org.tw/?p=108215"
+  },
+  {
+    "id": "s02",
+    "text": "中華電信現在在做網路地址電話定位，然後他會念你的地址給你聽，是的就按1不是就按2 大家千萬別按，那是詐騙電話，剛剛同事有打電話到中華電信客服，這不是他們中華電信的，是詐騙”gasp!”趕快轉貼告知大家吧！ 千萬不要點進去，點進去，花3000元",
+    "expected": "INCORRECT",
+    "category": "scam",
+    "source": "https://tfc-taiwan.org.tw/fact-check-reports/migration-4649/"
+  },
+  {
+    "id": "s03",
+    "text": "【遠通電收】提醒您，您有一筆NT$50臨時停車費用未繳清，逾期將處新臺幣三百元罰鍰。 請複製官方網站連結並進行線上繳費 https://f-etc.online/",
+    "expected": "INCORRECT",
+    "category": "scam",
+    "source": "https://tfc-taiwan.org.tw/fact-check-reports/migration-9161/"
+  },
+  {
+    "id": "s04",
+    "text": "大家請留意 ~~~ 臺灣盛產的又換一種新詐騙方式了！ 他們會先在超市門口，挑選 18歲以上的人 ~~~ 送一瓶牛奶或者一包餅乾，一瓶飲料。 再請你 ~ 掃描行動條碼。 憑身份證 + 手機號碼，再錄個點頭的影片，就可以領一壺油或者一個充電寶或領一箱牛奶或者其他贈品。然後他們會用你的身份證號 + 手機相片來開個借貸帳號進行貸款。 請快告知身邊家人朋友，注意防範。 莫貪便宜上當受騙，切記切記！",
+    "expected": "INCORRECT",
+    "category": "scam",
+    "source": "https://tfc-taiwan.org.tw/fact-check-reports/migration-4496/"
+  },
+  {
+    "id": "s05",
+    "text": "麻煩—請轉發請轉發： 陳惠仁教授強調，如每個收到這份簡訊的人，能夠轉發十份給其他人，肯定至少有一條生命將會被挽救回來… 我已經做了我的部分了，希望你也能幫忙做了你的部分。感謝！ 熱的苦瓜水可以救你一輩子 再忙也要看，然後告訴別人， 把愛傳出去！ 熱苦瓜～只殺癌細胞！ 切２～３薄苦瓜片放在杯子裡， 加入熱水，它會變成「鹼性水」，每天飲用，對任何人都有益。 熱 苦瓜水能釋放一種抗癌物質，這是在醫藥領域有效治療癌症的最新進展 。 熱苦瓜汁對囊腫及腫瘤產生影響。 被證明能夠補救所有類型的癌症。 用苦瓜萃取物這種類型的治療，只會破壞惡性腫瘤細胞，它不影響健康的細胞。 另外苦瓜汁內的胺基酸和苦瓜多酚， 能調整高血壓，有效預防深靜脈栓塞，調整血液迴圈，減低血液凝塊。",
+    "expected": "INCORRECT",
+    "category": "health",
+    "source": "https://tfc-taiwan.org.tw/fact-check-reports/migration-3968/"
+  },
+  {
+    "id": "s06",
+    "text": "我的美國朋友的消息，他的兒子是 醫生： 50歲以後 一個人可能會經歷 多種疾病。 但我最擔心的是 老年癡呆症 。 我不僅不能照顧自己， 但這會導致對家庭成員有很多不便之處。有一天，我的兒子回家告訴我，那個醫生朋友教了他一種用舌頭做的運動。舌頭運動可有效減少阿爾茨海默氏症的發作，也有助於減少/改善 * 1 *體重 * 2 *高血壓 * 3 *腦血栓 * 4 *哮喘 * 5 *遠視 * 6 *耳鳴 * 7 *喉嚨感染 * 8 *肩部/頸部感染 * 9 *失眠 動作非常簡單易學。",
+    "expected": "INCORRECT",
+    "category": "health",
+    "source": "https://tfc-taiwan.org.tw/fact-check-reports/migration-3821/"
+  },
+  {
+    "id": "s07",
+    "text": "我同學的嫡親外甥，碩士畢業，在深圳醫院工作。 現被抽調研究武漢肺炎病毒。 他剛剛來電讓我轉告訴朋友們：感冒時，如出現流鼻涕和咳痰者，就不可能是新型冠狀病毒肺炎，因為冠狀病毒肺炎是乾咳無流鼻涕，這是最簡單的鑑別方法。 請轉告你的朋友們，多了解一點醫學知識，就多一份鑑別和防範的意識。",
+    "expected": "INCORRECT",
+    "category": "health",
+    "source": "https://tfc-taiwan.org.tw/fact-check-reports/migration-2395/"
+  },
+  {
+    "id": "s08",
+    "text": "被蜈蚣咬傷、蜜蜂螫傷，可以用熱水沖洗傷口，重複約10-20分鐘。蜈蚣和蜜蜂的毒素會被熱分解，可以減輕腫脹，沖洗後塗上富含鎂的天然鹽效果更好",
+    "expected": "INCORRECT",
+    "category": "health",
+    "source": "https://tfc-taiwan.org.tw/fact-check-reports/migration-10798/"
+  },
+  {
+    "id": "s09",
+    "text": "吃素的人真的可以預防新冠肺炎已經有科學根據請轉發…聯合國向全人類發出了，盡量吃素",
+    "expected": "INCORRECT",
+    "category": "health",
+    "source": "https://tfc-taiwan.org.tw/fact-check-reports/migration-5922/"
+  },
+  {
+    "id": "s10",
+    "text": "踮腳尖的好處～ 讓腦神經像電腦ㄧ樣?可以歸零。 1.自律神經歸零?解除身體器官的失調。 2.刺激腳底的湧泉穴?排除體內陰濕.補陽氣。 3.增加免疫力、加強消化與解毒.排洩系統。 4.增加腳踝與小腿肌腱力.讓生活更美麗。 5.安神定心、平衡身心。 6.解除睡眠障礙.與失眠。 7.平衡心率不整，等心血管問題。 8.配合深呼吸，促使減重與強身。 9.加入微踮腳尖式的原地超慢跑.加速恢復身體機能的正常。 10.腿.腳有力、健康更有利。",
+    "expected": "PARTLY_CORRECT",
+    "category": "health",
+    "source": "https://tfc-taiwan.org.tw/fact-check-reports/migration-6050/"
+  },
+  {
+    "id": "s11",
+    "text": "請轉發：臺北市疫情急難抒困 只要戶籍在臺北市，在臺北通上傳身分証 存摺 直接發放一個人3000 不審財稅，以家庭為單位申請 兩人以上最多補助6000https://service.gov.taipei/Case/ApplyWay/202105310025 新北人，薪水3.9萬以下一人發一萬，線上申請（新聞連結。",
+    "expected": "PARTLY_CORRECT",
+    "category": "subsidy",
+    "source": "https://tfc-taiwan.org.tw/fact-check-reports/migration-5744/"
+  },
+  {
+    "id": "s12",
+    "text": "新冠肺炎確診者，如何向政府申請每天 1000 元的補助款？ 請遵照著影片說明做。",
+    "expected": "OUTDATED_OR_MISSING_CONDITIONS",
+    "category": "subsidy",
+    "source": "https://www.mygopen.com/2022/06/covid-subsidy.html"
+  },
+  {
+    "id": "s13",
+    "text": "1、我們已滿65歲了， 只要符合了圖示的其中一項，都有資格塗氟保護牙齒！ 2、以前衞服部，只規定：6歲以下的兒童才可以給付！ 3、112年3月衛福部已宣布，符合圖示中的資格 ～可以每三個月塗氟一次，以防一口爛牙，後患無窮⋯⋯！",
+    "expected": "CORRECT",
+    "category": "subsidy",
+    "source": "https://www.mygopen.com/2023/04/Fluoride.html"
+  },
+  {
+    "id": "s14",
+    "text": "下個月開始（育兒補助停發），藍白聯手通過，網路一片哀嚎：說好民生法案呢？",
+    "expected": "INCORRECT",
+    "category": "subsidy",
+    "source": "https://tfc-taiwan.org.tw/fact-check-reports/childcare-subsidy-not-ending-august-false-info/"
+  },
+  {
+    "id": "s15",
+    "text": "國民黨及民眾黨立委今日立法聯手全數通過，從明年1月起，不再對國民發放老人津貼、育兒津貼、租屋補貼、學費學貸補助、老農年金、優惠貸款補助、中低收入戶補助⋯",
+    "expected": "INCORRECT",
+    "category": "political",
+    "source": "https://tfc-taiwan.org.tw/fact-check-reports/migration-11052/"
+  },
+  {
+    "id": "s16",
+    "text": "軍公教退休金遞減中止方案，立法院已經通過了，明年不扣1.5%",
+    "expected": "INCORRECT",
+    "category": "political",
+    "source": "https://tfc-taiwan.org.tw/fact-check-reports/migration-11145/"
+  },
+  {
+    "id": "s17",
+    "text": "為什麼民進黨要阻止國會五法通過？總統國會答詢、人事同意權、調查調閱權、藐視國會、立法院長選舉記名表決都是2014年民進黨提案",
+    "expected": "PARTLY_CORRECT",
+    "category": "political",
+    "source": "https://tfc-taiwan.org.tw/fact-check-reports/migration-10668/"
+  },
+  {
+    "id": "s18",
+    "text": "注意，民進黨政府宣布8月起就要強制住宅屋頂鋪光電板了 但是才發生過颱風天光電板被吹飛，砸破別人家屋頂、砸壞車，讓我們見識光電板成為血滴子的威力。那次颱風幸好沒砸到人身上，針對這個問題，民進黨政府竟然只說「維持計畫上路，會滾動式檢討」 這話裡的意思不就是等出事了再說?有夠扯",
+    "expected": "OUTDATED_OR_MISSING_CONDITIONS",
+    "category": "political",
+    "source": "https://www.mygopen.com/2026/06/solar-300.html"
+  },
+  {
+    "id": "s19",
+    "text": "七月到了，除了要持續落實防疫外，政府也有兩大類重要的措施如期上路，歡迎一起分享出去： 重點1：育兒新制上路！ ✅孕婦產檢補助的次數，從10次調高成14次，產檢假也從5天增加為7天。 ✅育嬰留職停薪的津貼，從薪水的六成增加到八成。 ✅擴大不孕症試管嬰兒補助：一般民眾第一次最高補助10萬元，後續每次最多補助6萬元。 重點2：居住正義新制上路！ ✅房地合一稅 2.0 ：2016年後取得的房地，若在持有2年內出售，將會課45%稅率。持有超過2年、未滿5年內出售，則會課35%稅率。 ✅實價登錄 2.0 ：房屋成交案件的地號和門牌要完整揭露，紅單交易也要納管並禁止轉售。",
+    "expected": "CORRECT",
+    "category": "political",
+    "source": "https://cofacts.tw/article/3j475juazxetp"
+  },
+  {
+    "id": "s20",
+    "text": "《護國神山只剩半屏山？》 機場這幅台積電人員「轉進」美國的末世景象，讓人看了心中淌血。 有人說：這是現代版新八國聯軍「沒有煙硝味的掠奪」！ 也有人說：當年，腐敗的清朝還知道抵抗八國聯軍，如今無恥的奴才政權，竟然歡欣鼓舞。。。。 我說：這難道不算是「掏空台灣」？台灣護國神山的根基被挖走了一半，連根拔起移植到美國，剩下的「半屏山」還能「護國」嗎？ 毫無疑問的，美國政府一定會盡快送給這群高科技人才及眷屬居留證，讓他們可以永久居留。一旦台灣不保，這「半屏山」就能在美國大後方繼續運轉生產，美國的半導體供應鏈完全不受影響。 請問，掏空台灣的，難道不是美國政府與民進黨政府聯手完成的？ 請問，這樣做，就能「抗中保台」？",
+    "expected": "OPINION",
+    "category": "political",
+    "source": "https://cofacts.tw/article/10lzrtx0l1ic8"
+  }
+]
