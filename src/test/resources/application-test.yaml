@@ -4,6 +4,8 @@ line:
     channel-secret: test-secret
     read-timeout: 2s
 spring:
+  datasource:
+    url: jdbc:sqlite:${java.io.tmpdir}/ailinebot-test-${random.uuid}.db?journal_mode=WAL
   ai:
     openai:
       api-key: test-key
@@ -11,3 +13,9 @@ spring:
         options:
           model: test-model
           temperature: 0
+bot:
+  media-dir: ${java.io.tmpdir}/ailinebot-test-media
+  media-max-bytes: 1024
+  media-max-attempts: 2
+  job-max-attempts: 2
+  scheduling-enabled: false

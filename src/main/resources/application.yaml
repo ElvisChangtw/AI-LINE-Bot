@@ -7,6 +7,12 @@ line:
 
 # 2) Spring AI / OpenAI
 spring:
+  datasource:
+    url: jdbc:sqlite:${BOT_DB_PATH:/data/app.db}?journal_mode=WAL
+    hikari:
+      maximum-pool-size: 1
+  flyway:
+    locations: classpath:db/migration
   ai:
     openai:
       api-key: ${OPENAI_API_KEY}
@@ -29,6 +35,25 @@ spring:
       max-attempts: 3
       backoff:
         initial-interval: 2s
+bot:
+  reply-deadline: 45s
+  reply-timeout: 15s
+  material-ttl: 7d
+  waiting-ttl: 24h
+  recent-window: 10m
+  self-material-min-chars: 20
+  job-lease: 3m
+  job-max-attempts: 3
+  stale-after: 30s
+  media-dir: ${BOT_MEDIA_DIR:/data/media}
+  media-max-bytes: 10485760
+  media-max-attempts: 3
+  media-download-timeout: 30s
+  job-retention: 90d
+  max-messages-per-reply: 5
+  recovery-interval-ms: 60000
+  cleanup-cron: "0 30 3 * * *"
+  scheduling-enabled: true
 management:
   endpoints:
     web:
