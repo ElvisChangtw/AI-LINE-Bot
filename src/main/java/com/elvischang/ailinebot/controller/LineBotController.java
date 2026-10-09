@@ -1,14 +1,10 @@
 package com.elvischang.ailinebot.controller;
 
-import com.elvischang.ailinebot.service.LineMessageService;
 import com.elvischang.ailinebot.webhook.LineSignatureVerifier;
+import com.elvischang.ailinebot.webhook.WebhookIngestService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linecorp.bot.jackson.ModelObjectMapper;
-import com.linecorp.bot.webhook.model.AudioMessageContent;
 import com.linecorp.bot.webhook.model.CallbackRequest;
-import com.linecorp.bot.webhook.model.Event;
-import com.linecorp.bot.webhook.model.MessageEvent;
-import com.linecorp.bot.webhook.model.TextMessageContent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -26,12 +22,12 @@ public class LineBotController {
     private static final Logger log = LoggerFactory.getLogger(LineBotController.class);
 
     private final LineSignatureVerifier signatureVerifier;
-    private final LineMessageService lineMessageService;
+    private final WebhookIngestService ingestService;
     private final ObjectMapper lineObjectMapper = ModelObjectMapper.createNewObjectMapper();
 
-    public LineBotController(LineSignatureVerifier signatureVerifier, LineMessageService lineMessageService) {
+    public LineBotController(LineSignatureVerifier signatureVerifier, WebhookIngestService ingestService) {
         this.signatureVerifier = signatureVerifier;
-        this.lineMessageService = lineMessageService;
+        this.ingestService = ingestService;
     }
 
     @GetMapping("/hello")
@@ -53,15 +49,11 @@ public class LineBotController {
             log.warn("webhook rejected: body is not a LINE callback");
             return ResponseEntity.badRequest().build();
         }
-        for (Event event : request.events()) {
-            if (event instanceof MessageEvent messageEvent) {
-                if (messageEvent.message() instanceof TextMessageContent) {
-                    lineMessageService.handleTextMessage(messageEvent);
-                } else if (messageEvent.message() instanceof AudioMessageContent) {
-                    lineMessageService.handleAudioMessage(messageEvent);
-                }
-            }
+        if (request == null || request.events() == null) {
+            log.warn("webhook rejected: body is not a LINE callback");
+            return ResponseEntity.badRequest().build();
         }
+        ingestService.ingest(request.events());
         return ResponseEntity.ok().build();
     }
 }

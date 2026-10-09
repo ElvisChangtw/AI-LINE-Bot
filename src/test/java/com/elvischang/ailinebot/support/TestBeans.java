@@ -16,4 +16,10 @@ public class TestBeans {
     public MutableClock mutableClock() {
         return new MutableClock(START);
     }
+
+    @Bean
+    @Primary
+    public RecordingFactCheckService recordingFactCheckService() {
+        return new RecordingFactCheckService();
+    }
 }

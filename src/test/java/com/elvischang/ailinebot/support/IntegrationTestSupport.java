@@ -50,6 +50,9 @@ public abstract class IntegrationTestSupport {
     @Autowired
     protected MockMvc mvc;
 
+    @Autowired
+    protected RecordingFactCheckService factChecks;
+
     @BeforeEach
     void resetSharedState() {
         jdbc.sql("DELETE FROM job").update();
@@ -57,6 +60,7 @@ public abstract class IntegrationTestSupport {
         jdbc.sql("DELETE FROM inbound_event").update();
         LINE.resetAll();
         clock.set(TestBeans.START);
+        factChecks.reset();
     }
 
     @AfterEach

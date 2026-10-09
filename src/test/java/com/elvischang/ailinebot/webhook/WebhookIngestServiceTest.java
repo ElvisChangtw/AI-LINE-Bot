@@ -2,6 +2,7 @@ package com.elvischang.ailinebot.webhook;
 
 import com.elvischang.ailinebot.delivery.BotReplies;
 import com.elvischang.ailinebot.job.ImageReceivedEvent;
+import com.elvischang.ailinebot.job.JobEventListener;
 import com.elvischang.ailinebot.job.JobReadyEvent;
 import com.elvischang.ailinebot.store.Job;
 import com.elvischang.ailinebot.store.JobKind;
@@ -15,6 +16,7 @@ import com.elvischang.ailinebot.store.SendState;
 import com.elvischang.ailinebot.support.IntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 
@@ -45,6 +47,9 @@ class WebhookIngestServiceTest extends IntegrationTestSupport {
 
     @Autowired
     ApplicationEvents events;
+
+    @MockBean
+    JobEventListener jobEventListener;
 
     private List<Job> allJobs() {
         return jdbc.sql("SELECT id FROM job ORDER BY created_at").query(String.class).list()
