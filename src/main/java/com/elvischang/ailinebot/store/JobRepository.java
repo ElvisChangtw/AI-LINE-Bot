@@ -218,6 +218,12 @@ public class JobRepository {
                 .update();
     }
 
+    public int expireGroup(String groupId) {
+        return jdbc.sql("UPDATE job SET send_state = 'EXPIRED' WHERE group_id = :g AND send_state IN ('WAITING_NEXT', 'CARRIED')")
+                .param("g", groupId)
+                .update();
+    }
+
     public int resetSendingToUnknown() {
         return jdbc.sql("UPDATE job SET send_state = 'UNKNOWN' WHERE send_state = 'SENDING_REPLY'").update();
     }

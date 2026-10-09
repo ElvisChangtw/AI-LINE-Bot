@@ -24,6 +24,7 @@ import com.linecorp.bot.webhook.model.DeliveryContext;
 import com.linecorp.bot.webhook.model.Event;
 import com.linecorp.bot.webhook.model.ImageMessageContent;
 import com.linecorp.bot.webhook.model.JoinEvent;
+import com.linecorp.bot.webhook.model.LeaveEvent;
 import com.linecorp.bot.webhook.model.MessageEvent;
 import com.linecorp.bot.webhook.model.TextMessageContent;
 import com.linecorp.bot.webhook.model.UnsendEvent;
@@ -75,6 +76,8 @@ public class WebhookIngestService {
                 ingestJoin(join, now);
             } else if (event instanceof UnsendEvent unsend) {
                 ingestUnsend(unsend, now);
+            } else if (event instanceof LeaveEvent leave) {
+                ingestLeave(leave, now);
             }
         }
     }
@@ -114,6 +117,16 @@ public class WebhookIngestService {
         String messageId = event.unsend().messageId();
         materials.delete(chat.get(), messageId);
         deleteMedia(chat.get(), messageId);
+    }
+
+    private void ingestLeave(LeaveEvent event, long now) {
+        Optional<String> chat = LineSources.chatId(event.source());
+        if (chat.isEmpty() || !isFirstDelivery(event.webhookEventId(), event.deliveryContext(), now)) {
+            return;
+        }
+        String chatId = chat.get();
+        materials.deleteGroup(chatId).forEach(messageId -> deleteMedia(chatId, messageId));
+        jobs.expireGroup(chatId);
     }
 
     private void deleteMedia(String chatId, String messageId) {

@@ -32,6 +32,7 @@ import static com.elvischang.ailinebot.support.Webhooks.groupImage;
 import static com.elvischang.ailinebot.support.Webhooks.groupMention;
 import static com.elvischang.ailinebot.support.Webhooks.groupText;
 import static com.elvischang.ailinebot.support.Webhooks.join;
+import static com.elvischang.ailinebot.support.Webhooks.leave;
 import static com.elvischang.ailinebot.support.Webhooks.parse;
 import static com.elvischang.ailinebot.support.Webhooks.unknownEvent;
 import static com.elvischang.ailinebot.support.Webhooks.unsend;
@@ -149,6 +150,32 @@ class WebhookIngestServiceTest extends IntegrationTestSupport {
         Job job = allJobs().getFirst();
         assertThat(job.kind()).isEqualTo(JobKind.NOTICE);
         assertThat(job.resultText()).isEqualTo(BotReplies.ASK_TO_QUOTE);
+    }
+
+    @Test
+    void leavingAGroupDeletesItsMaterialAndExpiresItsUndeliveredResults() throws Exception {
+        ingest.ingest(parse(body(groupText("e1", "Cg1", "99", "a"), groupText("e2", "Cg1", "200", "b"),
+                groupText("e3", "Cg2", "300", "c"))));
+        Path file = storedFile("Cg1", "200");
+        String carried = waitingResult("Cg1");
+        jobs.attachWaiting("Cg1", "carrier", 5, 0);
+        String waiting = waitingResult("Cg1");
+        String otherGroup = waitingResult("Cg2");
+
+        String webhook = body(leave("e4", "Cg1"));
+        ingest.ingest(parse(webhook));
+
+        assertThat(materials.find("Cg1", "99")).isEmpty();
+        assertThat(materials.find("Cg1", "200")).isEmpty();
+        assertThat(file).doesNotExist();
+        assertThat(jobs.find(carried).orElseThrow().sendState()).isEqualTo(SendState.EXPIRED);
+        assertThat(jobs.find(waiting).orElseThrow().sendState()).isEqualTo(SendState.EXPIRED);
+        assertThat(materials.find("Cg2", "300")).isPresent();
+        assertThat(jobs.find(otherGroup).orElseThrow().sendState()).isEqualTo(SendState.WAITING_NEXT);
+
+        ingest.ingest(parse(body(groupText("e5", "Cg1", "400", "d"))));
+        ingest.ingest(parse(webhook));
+        assertThat(materials.find("Cg1", "400")).isPresent();
     }
 
     @Test

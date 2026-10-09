@@ -78,6 +78,12 @@ public final class Webhooks {
                 .formatted(eventId, eventId, group(groupId));
     }
 
+    public static String leave(String eventId, String groupId) {
+        return ("{\"type\":\"leave\",\"mode\":\"active\",\"timestamp\":1760054400000,\"webhookEventId\":\"%s\","
+                + "\"deliveryContext\":{\"isRedelivery\":false},\"source\":%s}")
+                .formatted(eventId, group(groupId));
+    }
+
     public static String unsend(String eventId, String groupId, String messageId) {
         return ("{\"type\":\"unsend\",\"mode\":\"active\",\"timestamp\":1760054400000,\"webhookEventId\":\"%s\","
                 + "\"deliveryContext\":{\"isRedelivery\":false},\"source\":%s,\"unsend\":{\"messageId\":\"%s\"}}")

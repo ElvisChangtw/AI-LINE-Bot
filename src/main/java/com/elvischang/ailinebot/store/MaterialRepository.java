@@ -64,6 +64,13 @@ public class MaterialRepository {
                 .update();
     }
 
+    public List<String> deleteGroup(String groupId) {
+        return jdbc.sql("DELETE FROM material WHERE group_id = :g RETURNING message_id")
+                .param("g", groupId)
+                .query(String.class)
+                .list();
+    }
+
     public List<Material> recentCandidates(String groupId, long since, String excludeMessageId) {
         return jdbc.sql("""
                         SELECT * FROM material
