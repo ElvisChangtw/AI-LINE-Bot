@@ -1,0 +1,46 @@
+{
+  "id": "resp_test_vaccine",
+  "object": "response",
+  "created_at": 1760000000,
+  "status": "completed",
+  "model": "gpt-6-luna",
+  "output": [
+    { "id": "rs_1", "type": "reasoning", "summary": [] },
+    {
+      "id": "ws_1",
+      "type": "web_search_call",
+      "status": "completed",
+      "action": {
+        "type": "search",
+        "query": "接到電話 按1 手機被屏蔽 疫苗",
+        "sources": [
+          { "type": "url", "url": "https://tfc-taiwan.org.tw/?p=108215&utm_source=line" },
+          { "type": "url", "url": "https://en.cofacts.tw/article/2xegenmqt9ehy" }
+        ]
+      }
+    },
+    {
+      "id": "msg_1",
+      "type": "message",
+      "status": "completed",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "{\"overall_verdict\":\"INCORRECT\",\"political\":false,\"headline\":\"2021 年就在流傳的舊謠言\",\"claims\":[{\"text\":\"按 1 手機會被屏蔽\",\"verdict\":\"INCORRECT\",\"reason\":\"電話裡按 1 或按 2，不會讓手機被控制\"},{\"text\":\"疾管署打電話問接種\",\"verdict\":\"INCORRECT\",\"reason\":\"疾管署說，他們不會打電話問你有沒有打疫苗\"}],\"safety_tip\":true,\"sources\":[{\"url\":\"https://tfc-taiwan.org.tw/?p=108215\",\"title\":\"網傳按1手機被屏蔽\",\"publisher\":\"台灣事實查核中心\",\"published_date\":\"\"},{\"url\":\"https://example.com/made-up\",\"title\":\"不存在\",\"publisher\":\"假來源\",\"published_date\":\"\"}]}",
+          "annotations": [
+            { "type": "url_citation", "start_index": 0, "end_index": 10, "title": "Cofacts", "url": "https://www.mygopen.com/2021/09/vaccine-call.html" }
+          ],
+          "logprobs": []
+        }
+      ]
+    }
+  ],
+  "usage": {
+    "input_tokens": 20000,
+    "input_tokens_details": { "cached_tokens": 0 },
+    "output_tokens": 4000,
+    "output_tokens_details": { "reasoning_tokens": 2500 },
+    "total_tokens": 24000
+  }
+}
