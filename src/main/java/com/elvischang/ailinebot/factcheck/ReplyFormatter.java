@@ -1,0 +1,97 @@
+package com.elvischang.ailinebot.factcheck;
+
+import com.elvischang.ailinebot.delivery.BotReplies;
+
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+public final class ReplyFormatter {
+
+    private static final int MAX_LENGTH = 500;
+    private static final int MAX_REASONS = 3;
+    private static final int MAX_SOURCES = 2;
+    private static final String PREFIX = "【查證結果】";
+    private static final String BULLET = "・";
+    private static final Map<Verdict, String> LABELS = new EnumMap<>(Map.of(
+            Verdict.CORRECT, "內容正確",
+            Verdict.INCORRECT, "這是假消息",
+            Verdict.PARTLY_CORRECT, "部分正確",
+            Verdict.OUTDATED_OR_MISSING_CONDITIONS, "過期了，或少了重要條件",
+            Verdict.INSUFFICIENT_EVIDENCE, "查不到足夠資料，還不能確定",
+            Verdict.OPINION, "這是看法，不是能查對錯的事"));
+
+    private ReplyFormatter() {
+    }
+
+    public static String format(FactCheckResult result, boolean materialHasLink) {
+        String header = PREFIX + LABELS.get(result.overall())
+                + (result.headline() == null || result.headline().isBlank() ? "" : "，" + result.headline().trim());
+        List<String> reasons = new ArrayList<>(result.claims().stream()
+                .map(FactCheckResult.Claim::reason)
+                .filter(reason -> reason != null && !reason.isBlank())
+                .map(reason -> BULLET + reason.trim())
+                .limit(MAX_REASONS)
+                .toList());
+        if (reasons.isEmpty() && result.overall() == Verdict.INSUFFICIENT_EVIDENCE) {
+            reasons.add(BULLET + BotReplies.NOTHING_RELIABLE_FOUND);
+        }
+        List<String> notes = new ArrayList<>();
+        if (result.safetyTip()) {
+            notes.add(BotReplies.SAFETY_TIP);
+        }
+        if (materialHasLink) {
+            notes.add(BotReplies.LINK_NOT_OPENED);
+        }
+        if (!result.political() && (result.overall() == Verdict.INCORRECT
+                || result.overall() == Verdict.OUTDATED_OR_MISSING_CONDITIONS)) {
+            notes.add(BotReplies.NO_FORWARD_NEEDED);
+        }
+        List<String> sources = new ArrayList<>(result.sources().stream()
+                .limit(MAX_SOURCES)
+                .map(ReplyFormatter::sourceBlock)
+                .toList());
+
+        String text = join(header, reasons, notes, sources);
+        while (text.length() > MAX_LENGTH && !sources.isEmpty()) {
+            sources.remove(sources.size() - 1);
+            text = join(header, reasons, notes, sources);
+        }
+        while (text.length() > MAX_LENGTH && reasons.size() > 1) {
+            reasons.remove(reasons.size() - 1);
+            text = join(header, reasons, notes, sources);
+        }
+        return text.length() > MAX_LENGTH ? text.substring(0, MAX_LENGTH - 1) + "…" : text;
+    }
+
+    private static String sourceBlock(FactCheckResult.Source source) {
+        String name = source.publisher() == null || source.publisher().isBlank() ? host(source.url()) : source.publisher().trim();
+        String date = source.publishedDate() == null || source.publishedDate().isBlank() ? "" : "（" + source.publishedDate().trim() + "）";
+        return "來源：" + name + date + "\n" + source.url();
+    }
+
+    private static String host(String url) {
+        try {
+            String host = URI.create(url).getHost();
+            if (host == null) {
+                return url;
+            }
+            host = host.toLowerCase(Locale.ROOT);
+            return host.startsWith("www.") ? host.substring(4) : host;
+        } catch (IllegalArgumentException e) {
+            return url;
+        }
+    }
+
+    private static String join(String header, List<String> reasons, List<String> notes, List<String> sources) {
+        List<String> lines = new ArrayList<>();
+        lines.add(header);
+        lines.addAll(reasons);
+        lines.addAll(notes);
+        lines.addAll(sources);
+        return String.join("\n", lines);
+    }
+}

@@ -19,6 +19,10 @@ public final class BotReplies {
             ・沒被 @ 的時候，我不會讀內容、也不會回覆
             ・為了讓大家之後能引用，群組的文字和圖片會暫存 7 天，到期自動刪除
             ・查證時，內容會送到 OpenAI 搜尋與判讀""";
+    public static final String SAFETY_TIP = "不要點連結、不要給驗證碼和帳號密碼，不放心可以打 165 問";
+    public static final String LINK_NOT_OPENED = "（我沒有打開訊息裡的連結）";
+    public static final String NO_FORWARD_NEEDED = "不用擔心，這則可以不用再轉傳囉";
+    public static final String NOTHING_RELIABLE_FOUND = "目前查不到可靠的資料可以確認";
 
     private BotReplies() {
     }
