@@ -28,6 +28,15 @@ class FactCheckAcceptanceTest extends IntegrationTestSupport {
     private static final String REPLY = "/v2/bot/message/reply";
     private static final String RESPONSES = "/v1/responses";
 
+    private static final String EXPECTED_VACCINE_REPLY = """
+            【查證結果】這是假消息，2021 年就在流傳的舊謠言
+            ・電話裡按 1 或按 2，不會讓手機被控制
+            ・疾管署說，他們不會打電話問你有沒有打疫苗
+            不要點連結、不要給驗證碼和帳號密碼，不放心可以打 165 問
+            不用擔心，這則可以不用再轉傳囉
+            來源：台灣事實查核中心
+            https://tfc-taiwan.org.tw/?p=108215""";
+
     @Autowired
     DefaultFactCheckService realService;
 
@@ -54,14 +63,7 @@ class FactCheckAcceptanceTest extends IntegrationTestSupport {
 
         await().atMost(Duration.ofSeconds(5)).until(() -> sendStateOf("100") == SendState.REPLIED);
         LINE.verify(postRequestedFor(urlEqualTo(REPLY))
-                .withRequestBody(matchingJsonPath("$.messages[0].text", equalTo("""
-                        【查證結果】這是假消息，2021 年就在流傳的舊謠言
-                        ・電話裡按 1 或按 2，不會讓手機被控制
-                        ・疾管署說，他們不會打電話問你有沒有打疫苗
-                        不要點連結、不要給驗證碼和帳號密碼，不放心可以打 165 問
-                        不用擔心，這則可以不用再轉傳囉
-                        來源：台灣事實查核中心
-                        https://tfc-taiwan.org.tw/?p=108215"""))));
+                .withRequestBody(matchingJsonPath("$.messages[0].text", equalTo(EXPECTED_VACCINE_REPLY))));
         assertThat(jdbc.sql("SELECT verdict || '/' || search_calls || '/' || cost_micro_usd FROM job WHERE trigger_message_id = '100'")
                 .query(String.class).single()).isEqualTo("INCORRECT/1/14000");
     }
@@ -77,9 +79,11 @@ class FactCheckAcceptanceTest extends IntegrationTestSupport {
         await().atMost(Duration.ofSeconds(5)).until(() -> sendStateOf("200") == SendState.REPLIED);
 
         LINE.verify(1, postRequestedFor(urlEqualTo(RESPONSES)));
+        LINE.verify(2, postRequestedFor(urlEqualTo(REPLY))
+                .withRequestBody(matchingJsonPath("$.messages[0].text", equalTo(EXPECTED_VACCINE_REPLY))));
         assertThat(jdbc.sql("SELECT COUNT(*) FROM verification_cache").query(Integer.class).single()).isEqualTo(1);
-        assertThat(jdbc.sql("SELECT result_json FROM verification_cache").query(String.class).single())
-                .doesNotContain("Cg1").doesNotContain("Cg2");
+        assertThat(jdbc.sql("SELECT name FROM pragma_table_info('verification_cache') ORDER BY cid").query(String.class).list())
+                .containsExactly("content_hash", "result_json", "created_at", "expires_at");
     }
 
     @Test
