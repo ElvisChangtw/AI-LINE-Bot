@@ -3,17 +3,20 @@ package com.elvischang.ailinebot.job;
 import com.elvischang.ailinebot.config.BotProperties;
 import com.elvischang.ailinebot.delivery.BotReplies;
 import com.elvischang.ailinebot.delivery.ReplySender;
+import com.elvischang.ailinebot.factcheck.FactCheckReply;
 import com.elvischang.ailinebot.factcheck.FactCheckService;
 import com.elvischang.ailinebot.line.Hashes;
 import com.elvischang.ailinebot.service.ImageGenerationService;
 import com.elvischang.ailinebot.store.Job;
 import com.elvischang.ailinebot.store.JobRepository;
+import com.elvischang.ailinebot.store.Material;
 import com.elvischang.ailinebot.store.MaterialRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.util.Optional;
 
 @Component
 public class JobRunner {
@@ -61,9 +64,7 @@ public class JobRunner {
             String result = switch (job.kind()) {
                 case NOTICE -> job.resultText();
                 case DELIVERY -> null;
-                case FACT_CHECK -> materials.find(job.groupId(), job.materialMessageId())
-                        .map(material -> factCheckService.verify(material, job.userQuestion()))
-                        .orElse(BotReplies.QUOTE_NOT_FOUND);
+                case FACT_CHECK -> factCheck(job);
                 case IMAGINE -> imagine(job.userQuestion());
             };
             jobs.complete(job.id(), result, clock.millis(), job.attempts());
@@ -81,6 +82,19 @@ public class JobRunner {
             log.warn("job will retry jobId={} kind={} attempts={} cause={}", job.id(), job.kind(), job.attempts(), code);
             return false;
         }
+    }
+
+    private String factCheck(Job job) {
+        Optional<Material> material = materials.find(job.groupId(), job.materialMessageId());
+        if (material.isEmpty()) {
+            return BotReplies.QUOTE_NOT_FOUND;
+        }
+        FactCheckReply reply = factCheckService.verify(material.get(), job.userQuestion());
+        if (reply.text() == null || reply.text().isBlank()) {
+            throw new IllegalStateException("fact check produced no reply");
+        }
+        jobs.recordFactCheck(job.id(), job.attempts(), reply.verdict(), reply.usage(), reply.costMicroUsd());
+        return reply.text();
     }
 
     private String imagine(String prompt) {

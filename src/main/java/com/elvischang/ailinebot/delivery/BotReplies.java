@@ -11,7 +11,8 @@ public final class BotReplies {
     public static final String ASK_TO_QUOTE = "請「引用」你要查的那則訊息，再 @ 我。";
     public static final String TOO_MANY_CANDIDATES = "最近有好幾則訊息，請「引用」你要查的那一則再 @ 我。";
     public static final String JOB_FAILED = "這則沒查成功，請再問我一次。";
-    public static final String FACT_CHECK_NOT_READY = "查證功能準備中，這則先不判斷。";
+    public static final String QUOTA_EXCEEDED = "今天的查證次數用完了，明天再問我";
+    public static final String IMAGE_NOT_READY = "這張圖還在處理，請過一分鐘再問我一次";
     public static final String DELAYED_PREFIX = "（回覆剛才的問題）\n";
     public static final String JOIN_NOTICE = """
             大家好，我是查證小幫手。

@@ -1,5 +1,6 @@
 package com.elvischang.ailinebot.support;
 
+import com.elvischang.ailinebot.factcheck.FactCheckReply;
 import com.elvischang.ailinebot.factcheck.FactCheckService;
 import com.elvischang.ailinebot.store.Material;
 
@@ -11,15 +12,17 @@ public class RecordingFactCheckService implements FactCheckService {
 
     private final List<String> calls = new CopyOnWriteArrayList<>();
     private volatile Function<Material, String> behavior = RecordingFactCheckService::defaultResult;
+    private volatile FactCheckService delegate;
 
     private static String defaultResult(Material material) {
         return "TEST RESULT " + material.messageId();
     }
 
     @Override
-    public String verify(Material material, String userQuestion) {
+    public FactCheckReply verify(Material material, String userQuestion) {
         calls.add(material.messageId());
-        return behavior.apply(material);
+        FactCheckService real = delegate;
+        return real != null ? real.verify(material, userQuestion) : FactCheckReply.notice(behavior.apply(material));
     }
 
     public List<String> calls() {
@@ -30,8 +33,13 @@ public class RecordingFactCheckService implements FactCheckService {
         this.behavior = newBehavior;
     }
 
+    public void delegateTo(FactCheckService real) {
+        this.delegate = real;
+    }
+
     public void reset() {
         calls.clear();
         behavior = RecordingFactCheckService::defaultResult;
+        delegate = null;
     }
 }
