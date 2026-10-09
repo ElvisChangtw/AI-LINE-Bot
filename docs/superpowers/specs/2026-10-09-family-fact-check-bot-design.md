@@ -13,7 +13,8 @@
 成功標準：
 
 - 群組成員引用一則素材再 @ bot，bot 在一則訊息內回覆結論、理由、來源。
-- 沒被 @ 的訊息，bot 不呼叫模型、不發任何訊息。
+- 沒被 @ 的訊息，bot 不呼叫模型，也不回應它的內容。唯一例外：有來不及即時送出的查證結果時，會趁這則訊息的 reply token 送出（§7）。
+- 完全不用 push，LINE 不產生任何費用。
 - 來源網址一定來自實際的搜尋結果，不編造。
 - 查不到就說查不到，不硬判成錯。
 - 重啟、部署、LINE 重送都不會造成漏回或重複回覆（例外見 §7 的 UNKNOWN）。
@@ -28,6 +29,7 @@
 | 持久化 | SQLite，單一檔案掛 docker volume |
 | 背景工作 | 單一 Spring Boot：寫入後由 `AFTER_COMMIT` event 立刻執行，DB 的 job 列當作恢復紀錄，另加低頻補救掃描 |
 | reply 送出結果不明 | 不補送，記 `UNKNOWN`。寧可偶爾沒回，也不要重複 |
+| 來不及即時 reply 的結果 | 不用 push（按群組人數計費）。存成待送，等同群組下一則訊息進來時，用它的 reply token 送出 |
 | 政治內容 | 被 @ 就查；只查可查證的事實，立場標成「看法」；不加「不用再轉傳」 |
 | 語音 | 第一階段只修 gate（不再自動轉錄回覆）；引用語音回「之後才支援」 |
 | CI/CD | GitHub Actions → ECR → SSM Run Command 部署到 Lightsail，health check 失敗自動 rollback |
@@ -50,7 +52,7 @@
 | 來源／訊息 | 行為 |
 |---|---|
 | 1:1（`UserSource`） | 不回應、不保存 |
-| 群組或多人聊天室，文字，沒 @ bot | 存成素材，不呼叫模型，不回覆 |
+| 群組或多人聊天室，文字，沒 @ bot | 存成素材，不呼叫模型，不回覆（有待送結果時例外，見 §7） |
 | 群組，圖片 | 存成素材並下載檔案（§10），不呼叫模型，不回覆 |
 | 群組，語音／影片 | 只記錄 message id，不下載、不回覆 |
 | 群組，文字，有 @ bot | 建立 job（見下方「找素材」） |
@@ -86,11 +88,13 @@ POST /callback
     - inbound_event：INSERT OR IGNORE webhookEventId（已存在就整個 event 跳過）
     - 群組訊息寫成 material
     - 有 @ bot 就寫 job（PENDING）
+    - 該群組有 WAITING_NEXT 的結果，就用這則訊息認領（§7-C）
  3. commit 後回 200
 
 AFTER_COMMIT
  - JobCreatedEvent      ─► @Async jobExecutor：claim → 查證 → 存結果 → 送出
  - ImageReceivedEvent   ─► @Async mediaExecutor：下載圖片
+ - CarrierClaimedEvent  ─► @Async jobExecutor：用新訊息的 reply token 送出認領到的待送結果（§7-C）
 
 @Scheduled 補救掃描（開機一次，之後每 60 秒）
  - PENDING 超過 30 秒、或 RUNNING 但 lease 過期的 job → 重新派發
@@ -110,8 +114,7 @@ AFTER_COMMIT
 | `FactChecker`（介面） | 查證；實作 `OpenAiResponsesFactChecker` |
 | `CitationFilter` | 丟掉不在搜尋結果裡的來源 |
 | `ReplyFormatter` | 把結構化結果排成回覆文字 |
-| `ReplySender` | reply／push 選擇與送出狀態機（§7） |
-| `PushBudget` | 估算並累計當月 push 則數（按群組人數），超過預算就擋下 |
+| `ReplySender` | 送出狀態機：即時 reply、待送、搭下一則訊息送出（§7） |
 | `UsageGuard` | 每日／每月用量上限 |
 | `MediaStore` | 下載、大小限制、路徑安全、清理 |
 
@@ -141,31 +144,33 @@ CREATE TABLE material (
 );
 
 CREATE TABLE job (
-  id                TEXT PRIMARY KEY,     -- UUID，同時當 push 的 X-Line-Retry-Key
+  id                TEXT PRIMARY KEY,     -- UUID
   kind              TEXT NOT NULL,        -- FACT_CHECK | IMAGINE
   group_id          TEXT NOT NULL,
   trigger_message_id TEXT NOT NULL,
   quoted_message_id TEXT,
   user_question     TEXT,
   reply_token       TEXT,
+  quote_token       TEXT,                 -- 觸發訊息的 quoteToken，延遲送出時用來引用原問題
+  carrier_event_id  TEXT,                 -- 搭哪一則訊息的 reply token 送出
   received_at       INTEGER NOT NULL,
   status            TEXT NOT NULL,        -- PENDING | RUNNING | DONE | FAILED
   attempts          INTEGER NOT NULL DEFAULT 0,
   lease_until       INTEGER,
   result_text       TEXT,                 -- 送出前先存，重跑時不用再呼叫模型
   send_state        TEXT NOT NULL DEFAULT 'NOT_SENT',
-                    -- NOT_SENT | SENDING_REPLY | REPLIED | SENDING_PUSH | PUSHED | UNKNOWN | SEND_FAILED
+                    -- NOT_SENT | SENDING_REPLY | REPLIED | WAITING_NEXT | UNKNOWN | EXPIRED
   verdict           TEXT,
   error_code        TEXT,
   input_tokens      INTEGER,
   output_tokens     INTEGER,
   search_calls      INTEGER,
   cost_micro_usd    INTEGER,
-  push_units        INTEGER NOT NULL DEFAULT 0, -- push 時的群組人數，即 LINE 計費則數
   created_at        INTEGER NOT NULL,
   finished_at       INTEGER
 );
 CREATE INDEX job_group_status ON job(group_id, status);
+CREATE INDEX job_group_send ON job(group_id, send_state);
 
 CREATE TABLE verification_cache (
   content_hash TEXT PRIMARY KEY,          -- sha256(prompt 版本 + 正規化文字 + 圖片 hash)
@@ -177,8 +182,8 @@ CREATE TABLE verification_cache (
 
 - 所有查詢都帶 `group_id`，引用查找是 `WHERE group_id = ? AND message_id = ?`，跨群組引用一定查不到。
 - 不存 LINE `userId`、顯示名稱。
-- 用量不另開表：`UsageGuard` 用 `SUM(cost_micro_usd)`、`PushBudget` 用 `SUM(push_units)`，按日／月加總 `job` 表即可。job 列保留 90 天（只有計量欄位，`result_text` 和 `user_question` 7 天後清成 NULL）。
-- bot 自己送出的回覆也寫成 `material(kind = BOT_REPLY)`，用來辨認「引用到 bot 自己」。送出的 message id 從 reply／push response 的 `sentMessages` 取得（實作時以 SDK v9.7.0 的 response model class 確認欄位；沒有這個欄位的話，就退一步用「引用到的 id 不在 material 表」來判斷）。
+- 用量不另開表：`UsageGuard` 用 `SUM(cost_micro_usd)` 按日／月加總 `job` 表即可。job 列保留 90 天（只有計量欄位，`result_text` 和 `user_question` 7 天後清成 NULL）。
+- bot 自己送出的回覆也寫成 `material(kind = BOT_REPLY)`，用來辨認「引用到 bot 自己」。送出的 message id 從 reply response 的 `sentMessages` 取得（實作時以 SDK v9.7.0 的 response model class 確認欄位；沒有這個欄位的話，就退一步用「引用到的 id 不在 material 表」來判斷）。
 
 ## 7. 工作執行與送出
 
@@ -195,42 +200,50 @@ WHERE id=:id AND status='PENDING'
 - lease 3 分鐘。超過 lease 的 RUNNING：`send_state = NOT_SENT` 就放回 PENDING；`attempts ≥ 3` 就標 FAILED。
 - 結果先寫進 `result_text` 再送出。重跑時有結果就直接送，不再呼叫模型。
 
-送出狀態機：
+送出規則（**只用 reply，完全不用 push**）：
+
+LINE 的 push 按群組人數計費（10 人群組 push 一次算 10 則，台灣輕用量方案每月免費 200 則），reply 不計費。群組裡每一則訊息都帶自己的 reply token，所以來不及即時回的結果，就等群組下一則訊息進來時，用那則的 token 送出。
 
 ```
-deadline = received_at + 45s（config）
-
-now < deadline 且有 reply_token：
-   寫 SENDING_REPLY → replyMessage
+A. 自己的 reply token 還能用（now < received_at + 45s）：
+   寫 SENDING_REPLY → replyMessage(job 自己的 token, [自己的結果 + 被它帶上的待送結果])
      2xx                 → REPLIED
-     400（token 無效）    → 走 push
+     400                 → WAITING_NEXT（token 失效，等下一則訊息）
      逾時 / IO 錯誤 / 5xx → UNKNOWN，不補送（決策）
-否則：
-   寫 SENDING_PUSH → pushMessage(X-Line-Retry-Key = job.id)
-     2xx / 409（同一個 key 已收過）→ PUSHED
-     逾時 / 5xx → 用同一個 key 重試，最多 3 次，間隔指數退避
-     429 / 額度用完 → SEND_FAILED，記 log
+
+B. 來不及：
+   send_state = WAITING_NEXT，等同群組下一則訊息
+
+C. 同群組有新的訊息進來（任何人、任何類型）：
+   在 ingest transaction 裡用原子 UPDATE 認領該群組的 WAITING_NEXT（最舊的優先，最多 4 筆）：
+     UPDATE job SET send_state='SENDING_REPLY', carrier_event_id=:eventId
+     WHERE group_id=:g AND send_state='WAITING_NEXT' AND id IN (...最舊 4 筆...)
+   - 新訊息不是 @ bot：commit 後立刻用新訊息的 token 送出這些待送結果（不呼叫模型）
+   - 新訊息是 @ bot：待送結果掛在新 job 上，跟新 job 的答案合併在同一次 reply（走 A）；
+     新 job 也來不及的話，全部一起回到 WAITING_NEXT
+   SQLite 單一 writer，兩則訊息同時進來也只有一則認領得到
+
+D. WAITING_NEXT 超過 24 小時（config）→ EXPIRED，記 log，不再送
 
 開機恢復：
    SENDING_REPLY → UNKNOWN（不知道送出沒，不補送）
-   SENDING_PUSH  → 距第一次送出 < 23 小時：用同一個 retry key 重送（LINE 回 409 就代表已收過）
-                   ≥ 23 小時：UNKNOWN（retry key 只有 24 小時有效，過期會變成新訊息）
+   WAITING_NEXT  → 不動，照常等下一則訊息
 ```
 
-LINE 規則（官方文件）：
+延遲送出的格式：
+
+- 一次 reply 最多 5 個 message object：自己的答案 1 個＋待送最多 4 個，每個結果一個 text message。
+- 待送的結果用原本 @ bot 那則訊息的 `quoteToken` 引用它，並在開頭加「（回覆剛才的問題）」，讓大家知道在回哪一則。⚠ `quoteToken` 的有效期官方沒寫。如果 reply 因為 quoteToken 回 400，就拿掉 quoteToken 再試一次（第一次 400 沒有消耗 token）。這點實作時要在 LINE 測試 channel 驗證。
+
+這條規則改動了原需求的「沒 @ 不發訊息」，改成：**沒 @ 一律不呼叫模型；只有在有待送結果時，才會趁這則訊息把結果送出**。bot 不會解析或回應那則訊息本身的內容。
+
+其他 LINE 規則（官方文件）：
 
 - reply token 只能用一次，官方保證 1 分鐘內有效。設 45 秒的 deadline 是預留網路延遲。
-- reply 不能帶 `X-Line-Retry-Key`（會回 400），只有 push 能帶。
-- **push 按群組人數計費**：推到 10 人的群組算 10 則。台灣輕用量方案每月免費 200 則，等於一個 10 人群組一個月只能 push 20 次。reply 不計費。
+- FAILED 的 job（重試用完）、用量超過上限的通知，都走同一套 reply 規則。
+- 每個 job 的 `wait_ms + run_ms` 都會記下來，用來看有多少比例需要「等下一則」。
 
-所以 push 很珍貴，設計上：
-
-- 盡量在 45 秒內完成，讓結果走 reply：effort 用 medium、`max_tool_calls = 3`、單次呼叫逾時 40 秒。
-- `PushBudget`：每次 push 前用 `getGroupMemberCount`（多人聊天室用 `getRoomMemberCount`）估算這次的則數，累計到當月。超過 `line.monthly-push-budget`（預設 180，留 20 則緩衝）就不 push，記成 `SEND_FAILED / PUSH_BUDGET`。
-- FAILED 的 job（重試用完）：還在 reply 窗口內就 reply「這則沒查成功，請再問一次」；已經超時的話，只在 push 額度夠時才 push。
-- 每個 job 的 `wait_ms + run_ms` 都會記下來。上線後如果超過 45 秒的比例偏高，再考慮降 effort 或升級 LINE 方案（升級要花錢，由使用者決定）。
-
-webhook redelivery 在 LINE console 預設是關的。我們不管有沒有開都會去重；建議開啟，這樣主機短暫掛掉時事件不會遺失。改 console 屬於 LINE 設定，要經過授權。redelivery 的 reply token 一樣只有 1 分鐘，事件發生超過 20 分鐘就不能用，會自動走 push 判斷。
+webhook redelivery 在 LINE console 預設是關的。我們不管有沒有開都會去重；建議開啟，這樣主機短暫掛掉時事件不會遺失。改 console 屬於 LINE 設定，要經過授權。redelivery 的 reply token 一樣只有 1 分鐘有效，事件發生超過 20 分鐘就不能用，過期的就走 B。
 
 ## 8. 查證管線
 
@@ -472,15 +485,17 @@ infra/host/deploy.sh <sha>     記下目前 tag → pull → up -d → 60 秒內
 | 跨群組不混 context | 整合：B 群組引用 A 群組的 messageId → 找不到 |
 | 驗簽失敗不處理 | 整合：沒有或錯的 signature → 400，DB 沒有任何列 |
 | 重送不重複 | 整合：同一個 webhookEventId 送兩次 → 1 個 job、1 次回覆 |
-| 快工作 reply、慢工作 push | 單元 `ReplySender`（固定時鐘）＋整合（WireMock 延遲） |
-| reply 結果不明 | 單元：逾時 → UNKNOWN，沒有 push |
+| 快工作 reply、慢工作等下一則 | 單元 `ReplySender`（固定時鐘）：45 秒內 → reply；超過 → WAITING_NEXT。整合：之後一則非 @ 訊息進來 → 用它的 token 送出，且沒有呼叫模型 |
+| 下一則剛好是 @ | 整合：待送結果和新答案合併在同一次 reply |
+| 兩則訊息同時進來 | 整合：同一筆待送只被認領、送出一次 |
+| 待送過期 | 單元：超過 24 小時 → EXPIRED，不送 |
+| reply 結果不明 | 單元：逾時 → UNKNOWN，不補送 |
+| 整個系統不呼叫 push | 整合：所有測試結束後，WireMock 的 push endpoint 呼叫次數為 0 |
 | 媒體過期、下載失敗、來源不足 | 整合：blob 404／超過大小；`CitationFilter` 全丟光 → 證據不足 |
 | 正確／錯誤／過期／缺條件的輸出 | 單元 `ReplyFormatter`：每種 verdict × political 的固定 JSON 樣本 |
 | 重啟後恢復 | 整合：放一筆 RUNNING、lease 已過期的 job，啟動掃描 → 完成且只送一次 |
 | 暫存清理、容量限制 | 單元 `MediaStore`；整合 cleanup 排程 |
 | 用量上限 | 單元 `UsageGuard`：超過上限 → 不呼叫模型、回覆額度訊息 |
-| push 預算 | 單元 `PushBudget`：10 人群組、預算剩 5 則 → 不 push，記 `PUSH_BUDGET` |
-| push 重送安全 | 整合：push 逾時後重試帶同一個 retry key；WireMock 回 409 → 記成 PUSHED |
 
 - 測試環境：SQLite 暫存檔＋WireMock（LINE、OpenAI）。不用真 key，`contextLoads` 改用 test profile。
 - `scripts/eval/`：手動執行的真模型 eval，20 則**公開**謠言樣本（取自 Cofacts、台灣事實查核中心，包含疫苗按 1 那則、政治題、補助類），比對 Luna 與 Sol 的判讀和成本。不放家庭群組的真實訊息。會花錢，不進 CI，執行前要經過同意。
@@ -499,13 +514,14 @@ infra/host/deploy.sh <sha>     記下目前 tag → pull → up -d → 60 秒內
 - 模型不一定會打開素材裡的特定網址，回覆會說明。
 - 搜尋結果的品質決定查證品質。冷門的地方性消息常會是「證據不足」。
 - reply 送出結果不明時不補送，極少數情況會沒有回覆，需要再 @ 一次。
+- 來不及即時回的結果要等群組有人講話才會出現。夜裡問的，可能隔天早上才看到；超過 24 小時就不送了。
 - SQLite 只適合單一 instance。要跑多個 replica 時改用 Postgres，`job` 的 claim SQL 改成 `FOR UPDATE SKIP LOCKED`。
 - 語音、影片、YouTube 屬第二階段。
 - 程式完成不代表正式環境驗證過。部署、建立 AWS 資源、修改 LINE 設定都需要另外授權。
 
 ## 18. 查證紀錄與仍未驗證的項目
 
-2026-10-09 已對照官方文件或原始碼確認：SDK 沒有驗簽（v9.7.0 原始碼）、`gpt-6-luna`／`gpt-6.1-sol` 的 ID 與價格、Luna 支援 `web_search`、`max_tool_calls`、`action.sources`、Spring AI 沒有 GA 版支援 Responses API、reply token 規則、retry key 規則、push 按人數計費與每月 200 則、redelivery 預設關閉、`webhookEventId` 唯一、LINE 檔案保留期不保證、Lightsail firewall／snapshot／價格／metric、SSM 計費與 `wait` 的 100 秒上限、GitHub OIDC 條件、ECR lifecycle。
+2026-10-09 已對照官方文件或原始碼確認：SDK 沒有驗簽（v9.7.0 原始碼）、`gpt-6-luna`／`gpt-6.1-sol` 的 ID 與價格、Luna 支援 `web_search`、`max_tool_calls`、`action.sources`、Spring AI 沒有 GA 版支援 Responses API、reply token 規則、push 按人數計費與每月 200 則、redelivery 預設關閉、`webhookEventId` 唯一、LINE 檔案保留期不保證、Lightsail firewall／snapshot／價格／metric、SSM 計費與 `wait` 的 100 秒上限、GitHub OIDC 條件、ECR lifecycle。
 
 仍未驗證，實作時處理：
 
@@ -513,6 +529,8 @@ infra/host/deploy.sh <sha>     記下目前 tag → pull → up -d → 60 秒內
 |---|---|
 | structured output 能否和 `web_search` 並用 | 第 2 階段第一個 spike（§8.2），有退路 |
 | 引用圖片時 `quotedMessageId` 是否等於圖片 id | LINE 測試 channel 實測（需授權），有退路（§4） |
-| reply／push response 是否帶 `sentMessages` id | 實作時看 SDK model class，有退路（§6） |
+| reply response 是否帶 `sentMessages` id | 實作時看 SDK model class，有退路（§6） |
+| `quoteToken` 有效期、帶過期 quoteToken 的 reply 是否 400 且不消耗 token | LINE 測試 channel 實測（需授權）；退路是拿掉 quoteToken，只留「（回覆剛才的問題）」 |
+| 一次 reply 多個 message object 時，長輩看到的順序與呈現 | LINE 測試 channel 實測 |
 | SSM agent 憑證寫在 `[default]` profile | 只有原始碼可證，bootstrap 時用 `aws sts get-caller-identity` 實測 |
 | LINE webhook 能否打到 IPv6-only 主機 | 不驗證，直接選有 IPv4 的方案 |
