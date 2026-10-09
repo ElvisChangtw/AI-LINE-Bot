@@ -29,6 +29,23 @@ class CitationFilterTest {
     }
 
     @Test
+    void comparesChineseAndPercentEncodedUrlsDecoded() {
+        String raw = CitationFilter.normalize("https://zh.wikipedia.org/wiki/疫苗");
+        assertThat(CitationFilter.normalize("https://zh.wikipedia.org/wiki/%E7%96%AB%E8%8B%97")).isEqualTo(raw);
+        assertThat(CitationFilter.normalize("https://zh.wikipedia.org/wiki/%e7%96%ab%e8%8b%97")).isEqualTo(raw);
+        assertThat(CitationFilter.normalize("https://a.gov.tw/search?q=疫苗"))
+                .isEqualTo(CitationFilter.normalize("https://a.gov.tw/search?q=%E7%96%AB%E8%8B%97"));
+    }
+
+    @Test
+    void ignoresBlankUrls() {
+        FactCheckResult filtered = CitationFilter.apply(result(Verdict.INCORRECT, " "), Set.of("", " "));
+
+        assertThat(filtered.overall()).isEqualTo(Verdict.INSUFFICIENT_EVIDENCE);
+        assertThat(filtered.sources()).isEmpty();
+    }
+
+    @Test
     void keepsOnlySourcesTheModelActuallyConsulted() {
         FactCheckResult filtered = CitationFilter.apply(
                 result(Verdict.INCORRECT, "https://tfc-taiwan.org.tw/?p=108215", "https://example.com/made-up"),
