@@ -4,6 +4,8 @@ import com.elvischang.ailinebot.support.IntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.OptionalInt;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MaterialRepositoryTest extends IntegrationTestSupport {
@@ -43,12 +45,23 @@ class MaterialRepositoryTest extends IntegrationTestSupport {
     }
 
     @Test
+    void recentCandidatesAreNewestFirstAndCappedAtFive() {
+        for (int i = 0; i < 6; i++) {
+            materials.insert(text("Cg1", "c" + i, 100 + i, false));
+        }
+        assertThat(materials.recentCandidates("Cg1", 0, "none"))
+                .extracting(Material::messageId).containsExactly("c5", "c4", "c3", "c2", "c1");
+    }
+
+    @Test
     void recordsMediaFailuresUntilMax() {
         materials.insert(new Material("Cg1", "9", MaterialKind.IMAGE, null, false, MediaStatus.PENDING, null, 0, 100, 999));
-        assertThat(materials.recordMediaFailure("Cg1", "9", 2)).isEqualTo(1);
+        assertThat(materials.recordMediaFailure("Cg1", "9", 2)).isEqualTo(OptionalInt.of(1));
         assertThat(materials.find("Cg1", "9")).get().extracting(Material::mediaStatus).isEqualTo(MediaStatus.PENDING);
-        assertThat(materials.recordMediaFailure("Cg1", "9", 2)).isEqualTo(2);
+        assertThat(materials.recordMediaFailure("Cg1", "9", 2)).isEqualTo(OptionalInt.of(2));
         assertThat(materials.find("Cg1", "9")).get().extracting(Material::mediaStatus).isEqualTo(MediaStatus.FAILED);
+        assertThat(materials.recordMediaFailure("Cg1", "9", 2)).isEqualTo(OptionalInt.empty());
+        assertThat(materials.recordMediaFailure("Cg1", "missing", 2)).isEqualTo(OptionalInt.empty());
     }
 
     @Test

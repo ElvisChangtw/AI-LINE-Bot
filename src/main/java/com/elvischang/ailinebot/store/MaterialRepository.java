@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 
 @Repository
 public class MaterialRepository {
@@ -80,18 +81,21 @@ public class MaterialRepository {
                 .update();
     }
 
-    public int recordMediaFailure(String groupId, String messageId, int maxAttempts) {
-        jdbc.sql("""
+    public OptionalInt recordMediaFailure(String groupId, String messageId, int maxAttempts) {
+        return jdbc.sql("""
                         UPDATE material
                         SET media_attempts = media_attempts + 1,
                             media_status = CASE WHEN media_attempts + 1 >= :max THEN 'FAILED' ELSE media_status END
-                        WHERE group_id = :g AND message_id = :m
+                        WHERE group_id = :g AND message_id = :m AND media_status = 'PENDING'
+                        RETURNING media_attempts
                         """)
                 .param("max", maxAttempts)
                 .param("g", groupId)
                 .param("m", messageId)
-                .update();
-        return find(groupId, messageId).map(Material::mediaAttempts).orElse(maxAttempts);
+                .query(Integer.class)
+                .optional()
+                .map(OptionalInt::of)
+                .orElseGet(OptionalInt::empty);
     }
 
     public List<Material> pendingMedia(long createdBefore) {
