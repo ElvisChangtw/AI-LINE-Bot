@@ -3,6 +3,8 @@ package com.elvischang.ailinebot.factcheck;
 import com.elvischang.ailinebot.support.IntegrationTestSupport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.github.tomakehurst.wiremock.http.Fault;
+import com.openai.errors.OpenAIIoException;
 import com.openai.errors.OpenAIServiceException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -151,5 +153,23 @@ class OpenAiResponsesFactCheckerTest extends IntegrationTestSupport {
 
         assertThatThrownBy(() -> checker.check(textInput("x"))).isInstanceOf(OpenAIServiceException.class);
         LINE.verify(1, postRequestedFor(urlEqualTo(RESPONSES)));
+        assertThat(spendRows()).containsExactly(2_000L + 2_000L + 3 * 10_000L);
+    }
+
+    @Test
+    void recordsTheEstimateWhenTheConnectionFails() {
+        LINE.stubFor(post(urlEqualTo(RESPONSES)).willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)));
+
+        assertThatThrownBy(() -> checker.check(textInput("x"))).isInstanceOf(OpenAIIoException.class);
+        assertThat(spendRows()).containsExactly(34_000L);
+    }
+
+    @Test
+    void recordsNoSpendForClientErrors() {
+        LINE.stubFor(post(urlEqualTo(RESPONSES)).willReturn(aResponse().withStatus(400)));
+
+        assertThatThrownBy(() -> checker.check(textInput("x"))).isInstanceOf(OpenAIServiceException.class);
+        LINE.verify(1, postRequestedFor(urlEqualTo(RESPONSES)));
+        assertThat(spendRows()).isEmpty();
     }
 }

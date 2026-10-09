@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.core.JsonValue;
+import com.openai.errors.OpenAIIoException;
+import com.openai.errors.OpenAIServiceException;
 import com.openai.models.Reasoning;
 import com.openai.models.ReasoningEffort;
 import com.openai.models.responses.Response;
@@ -33,6 +35,9 @@ import java.util.Set;
 public class OpenAiResponsesFactChecker implements FactChecker {
 
     private static final int MAX_CLAIMS = 3;
+    private static final long ESTIMATED_FAILURE_INPUT_TOKENS = 20_000;
+    private static final long ESTIMATED_FAILURE_OUTPUT_TOKENS = 4_000;
+    private static final int FIRST_SERVER_ERROR_STATUS = 500;
     private static final String IMAGE_PLACEHOLDER = "（素材是一張圖片）";
     // The user's own words never reach the model: they bypass the delimiters and are not part of the cache key.
     private static final String FIXED_QUESTION = "這是真的嗎？";
@@ -74,7 +79,7 @@ public class OpenAiResponsesFactChecker implements FactChecker {
 
     @Override
     public ModelCheck check(FactCheckInput input) {
-        Response response = client.responses().create(params(input));
+        Response response = create(params(input));
         StringBuilder text = new StringBuilder();
         Set<String> consulted = new LinkedHashSet<>();
         int searchCalls = 0;
@@ -99,6 +104,25 @@ public class OpenAiResponsesFactChecker implements FactChecker {
         Usage usage = new Usage(in, out, searchCalls);
         spending.record(clock.millis(), usage.costMicroUsd(props));
         return new ModelCheck(parse(text.toString()), Set.copyOf(consulted), usage);
+    }
+
+    private Response create(ResponseCreateParams params) {
+        try {
+            return client.responses().create(params);
+        } catch (OpenAIIoException e) {
+            spending.record(clock.millis(), estimatedFailureCostMicroUsd());
+            throw e;
+        } catch (OpenAIServiceException e) {
+            if (e.statusCode() >= FIRST_SERVER_ERROR_STATUS) {
+                spending.record(clock.millis(), estimatedFailureCostMicroUsd());
+            }
+            throw e;
+        }
+    }
+
+    // A failed call may still have been billed, so assume a typical call that used every allowed search.
+    private long estimatedFailureCostMicroUsd() {
+        return new Usage(ESTIMATED_FAILURE_INPUT_TOKENS, ESTIMATED_FAILURE_OUTPUT_TOKENS, props.maxToolCalls()).costMicroUsd(props);
     }
 
     private ResponseCreateParams params(FactCheckInput input) {
