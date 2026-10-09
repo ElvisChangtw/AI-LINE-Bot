@@ -46,6 +46,13 @@ class JobRecoverySchedulerTest extends IntegrationTestSupport {
         return jobs.insert(new NewJob(JobKind.FACT_CHECK, "Cg1", "100", "99", "q", "rt-1", "qt-100", null), now);
     }
 
+    private String finishedJob() {
+        String id = factCheckJob();
+        jobs.claim(id, clock.millis(), 60_000);
+        jobs.complete(id, "結果", clock.millis(), 1);
+        return id;
+    }
+
     private Job job(String id) {
         return jobs.find(id).orElseThrow();
     }
@@ -107,6 +114,28 @@ class JobRecoverySchedulerTest extends IntegrationTestSupport {
         assertThat(job(id).sendState()).isEqualTo(SendState.UNKNOWN);
         await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
                 .untilAsserted(() -> LINE.verify(0, postRequestedFor(urlEqualTo(REPLY))));
+    }
+
+    @Test
+    void startupReleasesCarriedResultsWhoseCarrierIsFinished() {
+        String unknownCarrier = finishedJob();
+        jobs.setSendState(List.of(unknownCarrier), SendState.UNKNOWN);
+        String orphan = finishedJob();
+        jobs.markWaiting(List.of(orphan), 100);
+        jobs.attachWaiting("Cg1", unknownCarrier, 1, 0);
+        String liveCarrier = finishedJob();
+        String carried = finishedJob();
+        jobs.markWaiting(List.of(carried), 200);
+        jobs.attachWaiting("Cg1", liveCarrier, 1, 0);
+
+        recovery.afterSingletonsInstantiated();
+
+        Job released = job(orphan);
+        assertThat(released.sendState()).isEqualTo(SendState.WAITING_NEXT);
+        assertThat(released.carrierJobId()).isNull();
+        assertThat(released.waitingSince()).isEqualTo(100L);
+        assertThat(job(carried).sendState()).isEqualTo(SendState.CARRIED);
+        assertThat(job(carried).carrierJobId()).isEqualTo(liveCarrier);
     }
 
     @Test

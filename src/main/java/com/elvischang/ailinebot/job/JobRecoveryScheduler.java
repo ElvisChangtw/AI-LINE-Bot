@@ -44,6 +44,10 @@ public class JobRecoveryScheduler implements SmartInitializingSingleton {
         if (unknown > 0) {
             log.warn("startup marked {} in-flight replies as UNKNOWN", unknown);
         }
+        int released = jobs.releaseOrphanedCarried();
+        if (released > 0) {
+            log.info("startup returned {} unsent carried results to waiting", released);
+        }
     }
 
     @EventListener(ApplicationReadyEvent.class)

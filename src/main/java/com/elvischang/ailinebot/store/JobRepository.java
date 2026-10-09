@@ -228,6 +228,15 @@ public class JobRepository {
         return jdbc.sql("UPDATE job SET send_state = 'UNKNOWN' WHERE send_state = 'SENDING_REPLY'").update();
     }
 
+    public int releaseOrphanedCarried() {
+        return jdbc.sql("""
+                        UPDATE job SET send_state = 'WAITING_NEXT', carrier_job_id = NULL
+                        WHERE send_state = 'CARRIED' AND carrier_job_id IN (
+                            SELECT id FROM job WHERE send_state IN ('UNKNOWN', 'REPLIED', 'NOTHING_TO_SEND', 'EXPIRED'))
+                        """)
+                .update();
+    }
+
     public int clearContent(long createdBefore) {
         return jdbc.sql("""
                         UPDATE job SET result_text = NULL, user_question = NULL
