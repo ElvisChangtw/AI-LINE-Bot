@@ -2359,15 +2359,6 @@ class EvalRunTest {
         System.out.println("eval report: " + out.toAbsolutePath());
     }
 }
-```\n")
-                    .append(ReplyFormatter.format(filtered, false)).append("\n```\n\n");
-        }
-        report.append(String.format("%nmodel=%s matches=%d/%d totalCostMicroUsd=%d%n%n", props.model(), matches, samples.size(), totalCost));
-        Path out = Path.of("target", "eval-" + props.model() + ".md");
-        Files.writeString(out, report.append(replies).toString(), StandardCharsets.UTF_8);
-        System.out.println("eval report: " + out.toAbsolutePath());
-    }
-}
 ```
 
 - [ ] **Step 3：Commit（不執行）**
