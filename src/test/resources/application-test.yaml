@@ -1,0 +1,13 @@
+line:
+  bot:
+    channel-token: test-token
+    channel-secret: test-secret
+    read-timeout: 2s
+spring:
+  ai:
+    openai:
+      api-key: test-key
+      chat:
+        options:
+          model: test-model
+          temperature: 0
