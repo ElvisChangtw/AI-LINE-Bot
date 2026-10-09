@@ -19,6 +19,7 @@ import com.openai.models.responses.ResponseOutputMessage;
 import com.openai.models.responses.ResponseOutputText;
 import com.openai.models.responses.ResponseTextConfig;
 import com.openai.models.responses.WebSearchTool;
+import jakarta.annotation.PreDestroy;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -38,7 +39,7 @@ public class OpenAiResponsesFactChecker implements FactChecker {
     private final FactCheckPrompt prompt;
     private final ResponseFormatTextJsonSchemaConfig format;
     private final ObjectMapper mapper = new ObjectMapper()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+            .configure(DeserializationFeature.FAIL_ON_TRAILING_TOKENS, true);
 
     public OpenAiResponsesFactChecker(FactCheckProperties props, FactCheckPrompt prompt) {
         this.props = props;
@@ -56,6 +57,11 @@ public class OpenAiResponsesFactChecker implements FactChecker {
                 .schema(schema.build())
                 .strict(true)
                 .build();
+    }
+
+    @PreDestroy
+    void close() {
+        client.close();
     }
 
     @Override
@@ -109,7 +115,9 @@ public class OpenAiResponsesFactChecker implements FactChecker {
     }
 
     private static String userText(FactCheckInput input) {
-        String material = input.materialText() == null ? IMAGE_PLACEHOLDER : input.materialText();
+        String material = input.materialText() == null ? IMAGE_PLACEHOLDER : input.materialText()
+                .replace("<<<素材開始>>>", "＜＜＜素材開始＞＞＞")
+                .replace("<<<素材結束>>>", "＜＜＜素材結束＞＞＞");
         String question = input.userQuestion() == null || input.userQuestion().isBlank() ? "這是真的嗎？" : input.userQuestion();
         return "使用者的問題：" + question + "\n"
                 + "今天日期：" + input.today() + "（台灣時間）\n"
