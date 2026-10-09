@@ -1,5 +1,8 @@
 package com.elvischang.ailinebot.job;
 
+import com.elvischang.ailinebot.factcheck.FactCheckResult;
+import com.elvischang.ailinebot.factcheck.Verdict;
+import com.elvischang.ailinebot.factcheck.VerificationCacheRepository;
 import com.elvischang.ailinebot.media.MediaStore;
 import com.elvischang.ailinebot.store.InboundEventRepository;
 import com.elvischang.ailinebot.store.JobKind;
@@ -37,6 +40,9 @@ class CleanupSchedulerTest extends IntegrationTestSupport {
     @Autowired
     MediaStore mediaStore;
 
+    @Autowired
+    VerificationCacheRepository cache;
+
     @Test
     void removesExpiredMaterialsFilesWaitingResultsAndOldRows() throws Exception {
         long start = clock.millis();
@@ -51,9 +57,12 @@ class CleanupSchedulerTest extends IntegrationTestSupport {
         jobs.complete(waiting, "結果", start, 1);
         jobs.markWaiting(List.of(waiting), start);
 
+        cache.put("k", new FactCheckResult(Verdict.CORRECT, false, "s", List.of(), true, List.of()), start);
+
         clock.advance(Duration.ofDays(8));
         cleanup.cleanup();
 
+        assertThat(jdbc.sql("SELECT COUNT(*) FROM verification_cache").query(Long.class).single()).isZero();
         assertThat(materials.find("Cg1", "200")).isEmpty();
         assertThat(Files.exists(file)).isFalse();
         assertThat(jobs.find(waiting).orElseThrow().sendState()).isEqualTo(SendState.EXPIRED);

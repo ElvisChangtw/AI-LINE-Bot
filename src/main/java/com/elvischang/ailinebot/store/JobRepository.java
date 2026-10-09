@@ -1,5 +1,7 @@
 package com.elvischang.ailinebot.store;
 
+import com.elvischang.ailinebot.factcheck.Usage;
+import com.elvischang.ailinebot.factcheck.Verdict;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -251,5 +253,28 @@ public class JobRepository {
         return jdbc.sql("DELETE FROM job WHERE created_at < :before")
                 .param("before", createdBefore)
                 .update();
+    }
+
+    public void recordFactCheck(String id, int attempt, Verdict verdict, Usage usage, long costMicroUsd) {
+        jdbc.sql("""
+                        UPDATE job SET verdict = :verdict, input_tokens = :in, output_tokens = :out,
+                                       search_calls = :searches, cost_micro_usd = COALESCE(cost_micro_usd, 0) + :cost
+                        WHERE id = :id AND status = 'RUNNING' AND attempts = :attempt
+                        """)
+                .param("verdict", verdict == null ? null : verdict.name())
+                .param("in", usage.inputTokens())
+                .param("out", usage.outputTokens())
+                .param("searches", usage.searchCalls())
+                .param("cost", costMicroUsd)
+                .param("id", id)
+                .param("attempt", attempt)
+                .update();
+    }
+
+    public long sumCostSince(long since) {
+        return jdbc.sql("SELECT COALESCE(SUM(cost_micro_usd), 0) FROM job WHERE created_at >= :since")
+                .param("since", since)
+                .query(Long.class)
+                .single();
     }
 }

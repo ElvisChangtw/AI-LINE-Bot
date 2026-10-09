@@ -179,4 +179,21 @@ class JobRepositoryTest extends IntegrationTestSupport {
         assertThat(job.status()).isEqualTo(JobStatus.DONE);
         assertThat(job.resultText()).isEqualTo("r");
     }
+
+    @Test
+    void recordsFactCheckMetricsOnlyForTheCurrentAttempt() {
+        String id = jobs.insert(new NewJob(JobKind.FACT_CHECK, "Cg1", "t", "m", "q", "rt", "qt", null), 100);
+        jobs.claim(id, 100, 1000);
+        jobs.recordFactCheck(id, 1, com.elvischang.ailinebot.factcheck.Verdict.INCORRECT,
+                new com.elvischang.ailinebot.factcheck.Usage(10, 20, 3), 500);
+        jobs.recordFactCheck(id, 2, com.elvischang.ailinebot.factcheck.Verdict.CORRECT,
+                new com.elvischang.ailinebot.factcheck.Usage(1, 1, 1), 999);
+
+        assertThat(jdbc.sql("SELECT verdict, input_tokens, output_tokens, search_calls, cost_micro_usd FROM job WHERE id = :id")
+                .param("id", id).query((rs, n) -> rs.getString(1) + "/" + rs.getLong(2) + "/" + rs.getLong(3)
+                        + "/" + rs.getInt(4) + "/" + rs.getLong(5)).single())
+                .isEqualTo("INCORRECT/10/20/3/500");
+        assertThat(jobs.sumCostSince(0)).isEqualTo(500);
+        assertThat(jobs.sumCostSince(101)).isZero();
+    }
 }

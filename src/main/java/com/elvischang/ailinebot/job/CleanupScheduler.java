@@ -1,6 +1,7 @@
 package com.elvischang.ailinebot.job;
 
 import com.elvischang.ailinebot.config.BotProperties;
+import com.elvischang.ailinebot.factcheck.VerificationCacheRepository;
 import com.elvischang.ailinebot.line.Hashes;
 import com.elvischang.ailinebot.media.MediaStore;
 import com.elvischang.ailinebot.store.InboundEventRepository;
@@ -23,15 +24,17 @@ public class CleanupScheduler {
     private final JobRepository jobs;
     private final InboundEventRepository inboundEvents;
     private final MediaStore mediaStore;
+    private final VerificationCacheRepository cache;
     private final BotProperties props;
     private final Clock clock;
 
     public CleanupScheduler(MaterialRepository materials, JobRepository jobs, InboundEventRepository inboundEvents,
-                            MediaStore mediaStore, BotProperties props, Clock clock) {
+                            MediaStore mediaStore, VerificationCacheRepository cache, BotProperties props, Clock clock) {
         this.materials = materials;
         this.jobs = jobs;
         this.inboundEvents = inboundEvents;
         this.mediaStore = mediaStore;
+        this.cache = cache;
         this.props = props;
         this.clock = clock;
     }
@@ -52,7 +55,8 @@ public class CleanupScheduler {
         int clearedJobs = jobs.clearContent(now - props.materialTtl().toMillis());
         int deletedJobs = jobs.deleteOlderThan(now - props.jobRetention().toMillis());
         int deletedEvents = inboundEvents.deleteOlderThan(now - props.materialTtl().toMillis());
-        log.info("cleanup materials={} expiredWaiting={} clearedJobs={} deletedJobs={} deletedEvents={}",
-                deletedMaterials, expiredWaiting, clearedJobs, deletedJobs, deletedEvents);
+        int deletedCache = cache.deleteExpired(now);
+        log.info("cleanup materials={} expiredWaiting={} clearedJobs={} deletedJobs={} deletedEvents={} deletedCache={}",
+                deletedMaterials, expiredWaiting, clearedJobs, deletedJobs, deletedEvents, deletedCache);
     }
 }
