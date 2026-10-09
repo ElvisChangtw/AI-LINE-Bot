@@ -70,7 +70,7 @@ public final class ReplyFormatter {
     }
 
     private static String withoutLinks(String modelText) {
-        return modelText == null ? "" : LINK.matcher(modelText).replaceAll("").trim();
+        return modelText == null ? "" : LINK.matcher(modelText).replaceAll("").strip();
     }
 
     private static String sourceBlock(FactCheckResult.Source source) {
