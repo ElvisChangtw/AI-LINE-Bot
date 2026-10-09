@@ -34,14 +34,24 @@ class AcceptanceTest extends IntegrationTestSupport {
                 .query(String.class).optional().map(SendState::valueOf).orElse(null);
     }
 
+    private String materialKind(String groupId, String messageId) {
+        return jdbc.sql("SELECT kind FROM material WHERE group_id = :g AND message_id = :m")
+                .param("g", groupId).param("m", messageId).query(String.class).optional().orElse(null);
+    }
+
     @Test
     void plainGroupMessagesAndOneOnOneChatsNeverCallTheModelOrLine() throws Exception {
         postWebhook(body(groupText("e1", "Cg1", "100", "轉傳的訊息"), groupAudio("e2", "Cg1", "101"),
                 userText("e3", "U1", "102", "私訊")));
 
-        Thread.sleep(300);
-        assertThat(factChecks.calls()).isEmpty();
-        LINE.verify(0, anyRequestedFor(anyUrl()));
+        assertThat(jdbc.sql("SELECT COUNT(*) FROM job").query(Integer.class).single()).isZero();
+        assertThat(materialKind("Cg1", "100")).isEqualTo("TEXT");
+        assertThat(materialKind("Cg1", "101")).isEqualTo("AUDIO");
+        assertThat(jdbc.sql("SELECT COUNT(*) FROM material WHERE message_id = '102'").query(Integer.class).single()).isZero();
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            assertThat(factChecks.calls()).isEmpty();
+            LINE.verify(0, anyRequestedFor(anyUrl()));
+        });
     }
 
     @Test
@@ -64,9 +74,10 @@ class AcceptanceTest extends IntegrationTestSupport {
         postWebhook(webhook);
 
         await().atMost(Duration.ofSeconds(5)).until(() -> sendStateOf("100") == SendState.REPLIED);
-        Thread.sleep(300);
-        assertThat(factChecks.calls()).containsExactly("99");
-        LINE.verify(1, postRequestedFor(urlEqualTo(REPLY)));
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            assertThat(factChecks.calls()).containsExactly("99");
+            LINE.verify(1, postRequestedFor(urlEqualTo(REPLY)));
+        });
     }
 
     @Test
@@ -84,13 +95,16 @@ class AcceptanceTest extends IntegrationTestSupport {
         List<Callable<Void>> posts = List.of(
                 () -> { postWebhook(body(groupText("e3", "Cg1", "101", "早安"))); return null; },
                 () -> { postWebhook(body(groupText("e4", "Cg1", "102", "午安"))); return null; });
-        for (var future : pool.invokeAll(posts)) {
-            future.get();
+        try {
+            for (var future : pool.invokeAll(posts)) {
+                future.get();
+            }
+        } finally {
+            pool.shutdown();
         }
-        pool.shutdown();
 
         await().atMost(Duration.ofSeconds(5)).until(() -> sendStateOf("100") == SendState.REPLIED);
-        Thread.sleep(300);
-        LINE.verify(1, postRequestedFor(urlEqualTo(REPLY)).withRequestBody(containing("SLOW")));
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
+                .untilAsserted(() -> LINE.verify(1, postRequestedFor(urlEqualTo(REPLY)).withRequestBody(containing("SLOW"))));
     }
 }
