@@ -101,6 +101,22 @@ class MediaStoreTest extends IntegrationTestSupport {
     }
 
     @Test
+    void deletesTheFileWhenTheMaterialWasRemovedDuringDownload() {
+        LINE.stubFor(get(urlEqualTo("/v2/bot/message/206/content"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "image/jpeg").withBody("abc")
+                        .withFixedDelay(300)));
+        pendingImage("206");
+        var download = java.util.concurrent.CompletableFuture.runAsync(() -> mediaStore.download("Cg1", "206"));
+        await().atMost(Duration.ofSeconds(2)).until(() -> LINE.countRequestsMatching(
+                com.github.tomakehurst.wiremock.matching.RequestPattern.everything()).getCount() > 0);
+        jdbc.sql("DELETE FROM material WHERE group_id = 'Cg1' AND message_id = '206'").update();
+
+        download.join();
+
+        assertThat(mediaStore.storedFile("Cg1", "206")).isEmpty();
+    }
+
+    @Test
     void imageWebhookIsDownloadedInTheBackground() throws Exception {
         stubContent("205", 200, "abc".getBytes());
 

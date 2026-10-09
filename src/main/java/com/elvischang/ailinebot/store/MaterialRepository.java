@@ -86,8 +86,8 @@ public class MaterialRepository {
                 .list();
     }
 
-    public void markMedia(String groupId, String messageId, MediaStatus status, String sha256) {
-        jdbc.sql("UPDATE material SET media_status = :s, media_sha256 = :sha WHERE group_id = :g AND message_id = :m")
+    public int markMedia(String groupId, String messageId, MediaStatus status, String sha256) {
+        return jdbc.sql("UPDATE material SET media_status = :s, media_sha256 = :sha WHERE group_id = :g AND message_id = :m")
                 .param("s", status.name())
                 .param("sha", sha256)
                 .param("g", groupId)

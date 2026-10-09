@@ -63,7 +63,11 @@ public class MediaStore {
                 throw e;
             }
             String sha256 = writeLimited(content, target);
-            materials.markMedia(groupId, messageId, MediaStatus.STORED, sha256);
+            if (materials.markMedia(groupId, messageId, MediaStatus.STORED, sha256) == 0) {
+                delete(groupId, messageId);
+                log.info("media discarded after material removal groupHash={} messageId={}",
+                        Hashes.shortHash(groupId), messageId);
+            }
         } catch (MediaTooLargeException e) {
             materials.markMedia(groupId, messageId, MediaStatus.TOO_LARGE, null);
             log.info("media too large groupHash={} messageId={}", Hashes.shortHash(groupId), messageId);

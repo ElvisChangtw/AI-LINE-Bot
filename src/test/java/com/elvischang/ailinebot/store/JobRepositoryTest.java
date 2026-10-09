@@ -97,6 +97,17 @@ class JobRepositoryTest extends IntegrationTestSupport {
     }
 
     @Test
+    void expireGroupAlsoStopsResultsThatWereNeverSent() {
+        String unsent = finished("Cg1", 100);
+        String other = finished("Cg2", 100);
+
+        jobs.expireGroup("Cg1");
+
+        assertThat(jobs.find(unsent).orElseThrow().sendState()).isEqualTo(SendState.EXPIRED);
+        assertThat(jobs.find(other).orElseThrow().sendState()).isEqualTo(SendState.NOT_SENT);
+    }
+
+    @Test
     void clearsContentAndDeletesOldRows() {
         String a = finished("Cg1", 100);
         jobs.setSendState(List.of(a), SendState.REPLIED);
