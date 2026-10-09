@@ -115,7 +115,7 @@ AFTER_COMMIT
 | `UsageGuard` | 每日／每月用量上限 |
 | `MediaStore` | 下載、大小限制、路徑安全、清理 |
 
-技術選擇：`sqlite-jdbc`＋Spring `JdbcClient`＋Flyway，不用 JPA。SQLite 開 WAL、`busy_timeout=5000`。Hikari pool 大小設 1，所有寫入排隊執行。transaction 一律要短：**不能把模型呼叫包在 transaction 裡**。
+技術選擇：`sqlite-jdbc`＋Spring `JdbcClient`＋Flyway，不用 JPA。SQLite 開 WAL。Hikari pool 大小設 1，所有 DB 操作在 app 內排隊，不會有 SQLite 的鎖競爭。transaction 一律要短：**不能把模型呼叫包在 transaction 裡**。
 
 ## 6. 資料模型（SQLite）
 
@@ -226,7 +226,7 @@ LINE 規則（官方文件）：
 所以 push 很珍貴，設計上：
 
 - 盡量在 45 秒內完成，讓結果走 reply：effort 用 medium、`max_tool_calls = 3`、單次呼叫逾時 40 秒。
-- `PushBudget`：每次 push 前用 `getGroupMemberCount` 估算這次的則數，累計到當月。超過 `line.monthly-push-budget`（預設 180，留 20 則緩衝）就不 push，記成 `SEND_FAILED / PUSH_BUDGET`。
+- `PushBudget`：每次 push 前用 `getGroupMemberCount`（多人聊天室用 `getRoomMemberCount`）估算這次的則數，累計到當月。超過 `line.monthly-push-budget`（預設 180，留 20 則緩衝）就不 push，記成 `SEND_FAILED / PUSH_BUDGET`。
 - FAILED 的 job（重試用完）：還在 reply 窗口內就 reply「這則沒查成功，請再問一次」；已經超時的話，只在 push 額度夠時才 push。
 - 每個 job 的 `wait_ms + run_ms` 都會記下來。上線後如果超過 45 秒的比例偏高，再考慮降 effort 或升級 LINE 方案（升級要花錢，由使用者決定）。
 
@@ -376,6 +376,7 @@ https://tfc-taiwan.org.tw/?p=108215
 - 主機不抓素材裡的網址（無 SSRF 入口）。圖片下載只打 LINE 的 blob API。
 - 不執行任何外部指令。第一階段不呼叫 ffmpeg（語音不轉錄）。
 - secret 只從環境變數注入，不進 git、不進 image、不印 log。啟動時檢查必要 secret 都在，缺了就直接啟動失敗。
+- 家庭群組內容不進開發環境：正式機的 SQLite 和圖片不複製到開發機，也不貼進任何 coding agent session。除錯只看 `job` 表的計量欄位和 log（§12）。測試和 eval 只用公開的謠言樣本。
 - container 用非 root 使用者執行。
 
 ## 12. 觀測
@@ -482,7 +483,7 @@ infra/host/deploy.sh <sha>     記下目前 tag → pull → up -d → 60 秒內
 | push 重送安全 | 整合：push 逾時後重試帶同一個 retry key；WireMock 回 409 → 記成 PUSHED |
 
 - 測試環境：SQLite 暫存檔＋WireMock（LINE、OpenAI）。不用真 key，`contextLoads` 改用 test profile。
-- `scripts/eval/`：手動執行的真模型 eval，20 則真實轉傳訊息，比對 Luna 與 Sol 的判讀和成本。會花錢，不進 CI，執行前要經過同意。
+- `scripts/eval/`：手動執行的真模型 eval，20 則**公開**謠言樣本（取自 Cofacts、台灣事實查核中心，包含疫苗按 1 那則、政治題、補助類），比對 Luna 與 Sol 的判讀和成本。不放家庭群組的真實訊息。會花錢，不進 CI，執行前要經過同意。
 - 真的 LINE 端到端測試需要另開 LINE 測試 channel，不在本次範圍。
 
 ## 16. 實作順序
