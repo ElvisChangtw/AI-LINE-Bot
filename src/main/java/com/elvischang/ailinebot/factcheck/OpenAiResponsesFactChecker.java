@@ -39,8 +39,6 @@ public class OpenAiResponsesFactChecker implements FactChecker {
     private static final long ESTIMATED_FAILURE_OUTPUT_TOKENS = 4_000;
     private static final int FIRST_SERVER_ERROR_STATUS = 500;
     private static final String IMAGE_PLACEHOLDER = "（素材是一張圖片）";
-    // The user's own words never reach the model: they bypass the delimiters and are not part of the cache key.
-    private static final String FIXED_QUESTION = "這是真的嗎？";
 
     private final OpenAIClient client;
     private final FactCheckProperties props;
@@ -152,7 +150,8 @@ public class OpenAiResponsesFactChecker implements FactChecker {
         String material = input.materialText() == null ? IMAGE_PLACEHOLDER : input.materialText()
                 .replace("<<<素材開始>>>", "＜＜＜素材開始＞＞＞")
                 .replace("<<<素材結束>>>", "＜＜＜素材結束＞＞＞");
-        return "使用者的問題：" + FIXED_QUESTION + "\n"
+        String question = input.userQuestion() == null || input.userQuestion().isBlank() ? "這是真的嗎？" : input.userQuestion();
+        return "使用者的問題：" + question + "\n"
                 + "今天日期：" + input.today() + "（台灣時間）\n"
                 + "<<<素材開始>>>\n" + material + "\n<<<素材結束>>>";
     }
