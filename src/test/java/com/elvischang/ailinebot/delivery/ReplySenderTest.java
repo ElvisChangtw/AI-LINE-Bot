@@ -9,6 +9,7 @@ import com.elvischang.ailinebot.store.MaterialRepository;
 import com.elvischang.ailinebot.store.NewJob;
 import com.elvischang.ailinebot.store.SendState;
 import com.elvischang.ailinebot.support.IntegrationTestSupport;
+import com.github.tomakehurst.wiremock.http.Fault;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -132,6 +133,33 @@ class ReplySenderTest extends IntegrationTestSupport {
         sender.send(id);
 
         assertThat(state(id)).isEqualTo(SendState.UNKNOWN);
+        LINE.verify(1, postRequestedFor(urlEqualTo(REPLY)));
+    }
+
+    @Test
+    void connectionResetIsUnknownAndNotResent() {
+        LINE.stubFor(post(urlEqualTo(REPLY)).willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER)));
+        String id = finished(JobKind.FACT_CHECK, "qt-100", "結果", "rt-1");
+
+        sender.send(id);
+
+        assertThat(state(id)).isEqualTo(SendState.UNKNOWN);
+        LINE.verify(1, postRequestedFor(urlEqualTo(REPLY)));
+    }
+
+    @Test
+    void failedImagineIsRetriedWithoutQuote() {
+        stubRejected(1, true);
+        stubReplyOk("906");
+        long now = clock.millis();
+        String id = jobs.insert(new NewJob(JobKind.IMAGINE, "Cg1", "100", "99", "q", "rt-1", "qt-100", null), now);
+        jobs.claim(id, now, 60_000);
+        jobs.fail(id, BotReplies.JOB_FAILED, "X", now);
+
+        sender.send(id);
+
+        assertThat(state(id)).isEqualTo(SendState.REPLIED);
+        LINE.verify(2, postRequestedFor(urlEqualTo(REPLY)));
     }
 
     @Test
