@@ -64,4 +64,31 @@ class CleanupSchedulerTest extends IntegrationTestSupport {
         cleanup.cleanup();
         assertThat(jobs.find(waiting)).isEmpty();
     }
+
+    @Test
+    void cleanupContinuesWhenAFileCannotBeDeleted() throws Exception {
+        long start = clock.millis();
+        materials.insert(new Material("Cg1", "201", MaterialKind.IMAGE, null, false, MediaStatus.STORED, "h", 0, start, start + 1000));
+        materials.insert(new Material("Cg1", "202", MaterialKind.TEXT, "x", false, MediaStatus.NONE, null, 0, start, start + 1000));
+        var undeletable = mediaStore.pathFor("Cg1", "201");
+        Files.createDirectories(undeletable);
+        Files.writeString(undeletable.resolve("inner"), "abc");
+
+        String waiting = jobs.insert(new NewJob(JobKind.FACT_CHECK, "Cg1", "1", "1", "q", "rt", "qt", null), start);
+        jobs.claim(waiting, start, 1000);
+        jobs.complete(waiting, "結果", start);
+        jobs.markWaiting(List.of(waiting), start);
+
+        clock.advance(Duration.ofDays(8));
+        try {
+            cleanup.cleanup();
+
+            assertThat(materials.find("Cg1", "201")).isEmpty();
+            assertThat(materials.find("Cg1", "202")).isEmpty();
+            assertThat(jobs.find(waiting).orElseThrow().sendState()).isEqualTo(SendState.EXPIRED);
+        } finally {
+            Files.deleteIfExists(undeletable.resolve("inner"));
+            Files.deleteIfExists(undeletable);
+        }
+    }
 }

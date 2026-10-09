@@ -8,6 +8,7 @@ import com.elvischang.ailinebot.store.Material;
 import com.elvischang.ailinebot.store.MaterialRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
@@ -17,7 +18,7 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 
 @Component
-public class JobRecoveryScheduler {
+public class JobRecoveryScheduler implements SmartInitializingSingleton {
 
     private static final Logger log = LoggerFactory.getLogger(JobRecoveryScheduler.class);
     private static final String LEASE_EXPIRED = "LEASE_EXPIRED";
@@ -37,16 +38,24 @@ public class JobRecoveryScheduler {
         this.clock = clock;
     }
 
-    @EventListener(ApplicationReadyEvent.class)
-    public void onStartup() {
+    @Override
+    public void afterSingletonsInstantiated() {
         int unknown = jobs.resetSendingToUnknown();
         if (unknown > 0) {
             log.warn("startup marked {} in-flight replies as UNKNOWN", unknown);
         }
-        sweep();
     }
 
-    @Scheduled(fixedDelayString = "${bot.recovery-interval-ms:60000}")
+    @EventListener(ApplicationReadyEvent.class)
+    public void onStartup() {
+        try {
+            sweep();
+        } catch (RuntimeException e) {
+            log.error("startup sweep failed", e);
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${bot.recovery-interval-ms:60000}", initialDelayString = "${bot.recovery-interval-ms:60000}")
     public void sweep() {
         long now = clock.millis();
         long staleBefore = now - props.staleAfter().toMillis();

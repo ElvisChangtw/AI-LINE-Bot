@@ -1,6 +1,7 @@
 package com.elvischang.ailinebot.job;
 
 import com.elvischang.ailinebot.config.BotProperties;
+import com.elvischang.ailinebot.line.Hashes;
 import com.elvischang.ailinebot.media.MediaStore;
 import com.elvischang.ailinebot.store.InboundEventRepository;
 import com.elvischang.ailinebot.store.JobRepository;
@@ -41,8 +42,9 @@ public class CleanupScheduler {
         for (Material material : materials.expired(now)) {
             try {
                 mediaStore.delete(material.groupId(), material.messageId());
-            } catch (IllegalArgumentException e) {
-                log.debug("material {} has no media file", material.messageId());
+            } catch (RuntimeException e) {
+                log.warn("media delete failed groupHash={} messageId={} cause={}",
+                        Hashes.shortHash(material.groupId()), material.messageId(), e.getClass().getSimpleName());
             }
         }
         int deletedMaterials = materials.deleteExpired(now);

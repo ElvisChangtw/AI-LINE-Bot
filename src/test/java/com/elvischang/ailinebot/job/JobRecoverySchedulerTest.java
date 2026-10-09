@@ -101,10 +101,24 @@ class JobRecoverySchedulerTest extends IntegrationTestSupport {
         jobs.complete(id, "結果", clock.millis());
         jobs.setSendState(List.of(id), SendState.SENDING_REPLY);
 
+        recovery.afterSingletonsInstantiated();
         recovery.onStartup();
 
         assertThat(job(id).sendState()).isEqualTo(SendState.UNKNOWN);
-        LINE.verify(0, postRequestedFor(urlEqualTo(REPLY)));
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
+                .untilAsserted(() -> LINE.verify(0, postRequestedFor(urlEqualTo(REPLY))));
+    }
+
+    @Test
+    void redispatchesStalePendingJobs() {
+        stubReplyOk("900");
+        String id = factCheckJob();
+        clock.advance(Duration.ofSeconds(31));
+
+        recovery.sweep();
+
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> assertThat(job(id).sendState()).isEqualTo(SendState.REPLIED));
+        assertThat(factChecks.calls()).contains("99");
     }
 
     @Test
