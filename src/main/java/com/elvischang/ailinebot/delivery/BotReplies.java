@@ -9,7 +9,7 @@ public final class BotReplies {
     public static final String IMAGE_GONE = "這張圖已經拿不到了，請重新傳一次再引用我。";
     public static final String IMAGE_TOO_LARGE = "這張圖太大了（超過 10MB），請傳小一點的圖。";
     public static final String IMAGINE_NEEDS_PROMPT = "請在 /imagine 後面寫你想畫的內容，例如：/imagine 一隻戴帽子的貓";
-    public static final String ASK_TO_QUOTE ="請「引用」你要查的那則訊息，再 @ 我。";
+    public static final String ASK_TO_QUOTE = "請「引用」你要查的那則訊息，再 @ 我。";
     public static final String TOO_MANY_CANDIDATES = "最近有好幾則訊息，請「引用」你要查的那一則再 @ 我。";
     public static final String JOB_FAILED = "這則沒查成功，請再問我一次。";
     public static final String QUOTA_EXCEEDED = "今天的查證次數用完了，明天再問我";
