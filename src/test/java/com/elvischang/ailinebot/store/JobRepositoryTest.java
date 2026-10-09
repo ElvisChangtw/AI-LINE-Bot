@@ -16,7 +16,7 @@ class JobRepositoryTest extends IntegrationTestSupport {
     private String finished(String group, long now) {
         String id = jobs.insert(new NewJob(JobKind.FACT_CHECK, group, "t", "m", "q", "rt", "qt", null), now);
         jobs.claim(id, now, 1000);
-        jobs.complete(id, "result", now);
+        jobs.complete(id, "result", now, 1);
         return id;
     }
 
@@ -35,7 +35,7 @@ class JobRepositoryTest extends IntegrationTestSupport {
     void releasedJobCanBeClaimedAgain() {
         String id = jobs.insert(new NewJob(JobKind.FACT_CHECK, "Cg1", "t", "m", "q", "rt", "qt", null), 100);
         jobs.claim(id, 100, 1000);
-        jobs.release(id, "TIMEOUT");
+        jobs.release(id, "TIMEOUT", 1);
         assertThat(jobs.stalePending(101)).containsExactly(id);
         assertThat(jobs.claim(id, 200, 1000)).isTrue();
         assertThat(jobs.find(id).orElseThrow().attempts()).isEqualTo(2);
@@ -134,8 +134,8 @@ class JobRepositoryTest extends IntegrationTestSupport {
     void releaseAfterCompleteIsNoOp() {
         String id = jobs.insert(new NewJob(JobKind.FACT_CHECK, "Cg1", "t", "m", "q", "rt", "qt", null), 100);
         jobs.claim(id, 100, 1000);
-        jobs.complete(id, "result", 100);
-        jobs.release(id, "TIMEOUT");
+        jobs.complete(id, "result", 100, 1);
+        jobs.release(id, "TIMEOUT", 1);
         Job job = jobs.find(id).orElseThrow();
         assertThat(job.status()).isEqualTo(JobStatus.DONE);
         assertThat(job.errorCode()).isNull();
@@ -145,10 +145,27 @@ class JobRepositoryTest extends IntegrationTestSupport {
     void completeAfterReleaseIsNoOp() {
         String id = jobs.insert(new NewJob(JobKind.FACT_CHECK, "Cg1", "t", "m", "q", "rt", "qt", null), 100);
         jobs.claim(id, 100, 1000);
-        jobs.release(id, "TIMEOUT");
-        jobs.complete(id, "late", 200);
+        jobs.release(id, "TIMEOUT", 1);
+        jobs.complete(id, "late", 200, 1);
         Job job = jobs.find(id).orElseThrow();
         assertThat(job.status()).isEqualTo(JobStatus.PENDING);
         assertThat(job.resultText()).isNull();
+    }
+
+    @Test
+    void staleAttemptCannotTouchANewerClaim() {
+        String id = jobs.insert(new NewJob(JobKind.FACT_CHECK, "Cg1", "t", "m", "q", "rt", "qt", null), 100);
+        jobs.claim(id, 100, 1000);
+        jobs.release(id, "LEASE_EXPIRED", 1);
+        jobs.claim(id, 200, 1000);
+
+        jobs.release(id, "X", 1);
+        jobs.fail(id, "failed", "X", 300, 1);
+        assertThat(jobs.find(id).orElseThrow().status()).isEqualTo(JobStatus.RUNNING);
+
+        jobs.complete(id, "r", 400, 2);
+        Job job = jobs.find(id).orElseThrow();
+        assertThat(job.status()).isEqualTo(JobStatus.DONE);
+        assertThat(job.resultText()).isEqualTo("r");
     }
 }

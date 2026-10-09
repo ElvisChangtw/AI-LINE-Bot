@@ -68,7 +68,7 @@ class JobRecoverySchedulerTest extends IntegrationTestSupport {
         stubReplyOk("900");
         String id = factCheckJob();
         jobs.claim(id, clock.millis(), 1_000);
-        jobs.release(id, "TIMEOUT");
+        jobs.release(id, "TIMEOUT", 1);
         jobs.claim(id, clock.millis(), 1_000);
         clock.advance(Duration.ofSeconds(2));
 
@@ -86,7 +86,7 @@ class JobRecoverySchedulerTest extends IntegrationTestSupport {
         stubReplyOk("900");
         String id = factCheckJob();
         jobs.claim(id, clock.millis(), 60_000);
-        jobs.complete(id, "結果", clock.millis());
+        jobs.complete(id, "結果", clock.millis(), 1);
         clock.advance(Duration.ofSeconds(31));
 
         recovery.sweep();
@@ -98,7 +98,7 @@ class JobRecoverySchedulerTest extends IntegrationTestSupport {
     void startupTreatsInFlightRepliesAsUnknownAndDoesNotResend() {
         String id = factCheckJob();
         jobs.claim(id, clock.millis(), 60_000);
-        jobs.complete(id, "結果", clock.millis());
+        jobs.complete(id, "結果", clock.millis(), 1);
         jobs.setSendState(List.of(id), SendState.SENDING_REPLY);
 
         recovery.afterSingletonsInstantiated();

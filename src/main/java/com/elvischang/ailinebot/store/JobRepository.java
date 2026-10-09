@@ -82,35 +82,41 @@ public class JobRepository {
                 .update() == 1;
     }
 
-    public void complete(String id, String resultText, long now) {
+    public void complete(String id, String resultText, long now, int attempt) {
         jdbc.sql("""
                         UPDATE job SET status = 'DONE', result_text = :result, lease_until = NULL,
                                        error_code = NULL, finished_at = :now
-                        WHERE id = :id AND status = 'RUNNING'
+                        WHERE id = :id AND status = 'RUNNING' AND attempts = :attempt
                         """)
                 .param("result", resultText)
                 .param("now", now)
                 .param("id", id)
+                .param("attempt", attempt)
                 .update();
     }
 
-    public void fail(String id, String resultText, String errorCode, long now) {
+    public void fail(String id, String resultText, String errorCode, long now, int attempt) {
         jdbc.sql("""
                         UPDATE job SET status = 'FAILED', result_text = :result, lease_until = NULL,
                                        error_code = :code, finished_at = :now
-                        WHERE id = :id AND status = 'RUNNING'
+                        WHERE id = :id AND status = 'RUNNING' AND attempts = :attempt
                         """)
                 .param("result", resultText)
                 .param("code", errorCode)
                 .param("now", now)
                 .param("id", id)
+                .param("attempt", attempt)
                 .update();
     }
 
-    public void release(String id, String errorCode) {
-        jdbc.sql("UPDATE job SET status = 'PENDING', lease_until = NULL, error_code = :code WHERE id = :id AND status = 'RUNNING'")
+    public void release(String id, String errorCode, int attempt) {
+        jdbc.sql("""
+                        UPDATE job SET status = 'PENDING', lease_until = NULL, error_code = :code
+                        WHERE id = :id AND status = 'RUNNING' AND attempts = :attempt
+                        """)
                 .param("code", errorCode)
                 .param("id", id)
+                .param("attempt", attempt)
                 .update();
     }
 

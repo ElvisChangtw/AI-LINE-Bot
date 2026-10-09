@@ -66,18 +66,18 @@ public class JobRunner {
                         .orElse(BotReplies.QUOTE_NOT_FOUND);
                 case IMAGINE -> imagine(job.userQuestion());
             };
-            jobs.complete(job.id(), result, clock.millis());
+            jobs.complete(job.id(), result, clock.millis(), job.attempts());
             log.info("job done jobId={} kind={} groupHash={} attempt={} runMs={}",
                     job.id(), job.kind(), Hashes.shortHash(job.groupId()), job.attempts(), clock.millis() - started);
             return true;
         } catch (RuntimeException e) {
             String code = e.getClass().getSimpleName();
             if (job.attempts() >= props.jobMaxAttempts()) {
-                jobs.fail(job.id(), BotReplies.JOB_FAILED, code, clock.millis());
+                jobs.fail(job.id(), BotReplies.JOB_FAILED, code, clock.millis(), job.attempts());
                 log.warn("job failed jobId={} kind={} attempts={} cause={}", job.id(), job.kind(), job.attempts(), code);
                 return true;
             }
-            jobs.release(job.id(), code);
+            jobs.release(job.id(), code, job.attempts());
             log.warn("job will retry jobId={} kind={} attempts={} cause={}", job.id(), job.kind(), job.attempts(), code);
             return false;
         }

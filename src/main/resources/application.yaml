@@ -32,7 +32,7 @@ spring:
           size: 1024x1024
           quality: standard
     retry:
-      max-attempts: 3
+      max-attempts: 1
       backoff:
         initial-interval: 2s
 bot:
@@ -42,7 +42,7 @@ bot:
   waiting-ttl: 24h
   recent-window: 10m
   self-material-min-chars: 20
-  job-lease: 3m
+  job-lease: 5m
   job-max-attempts: 3
   stale-after: 30s
   media-dir: ${BOT_MEDIA_DIR:/data/media}

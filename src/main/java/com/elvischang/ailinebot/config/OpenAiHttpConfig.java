@@ -14,7 +14,7 @@ public class OpenAiHttpConfig {
     @Bean
     RestClientCustomizer longTimeoutCustomizer() {
 
-        Duration timeout = Duration.ofSeconds(300);
+        Duration timeout = Duration.ofSeconds(120);
         return builder -> builder.requestFactory(
                 ClientHttpRequestFactories.get(
                         ClientHttpRequestFactorySettings.DEFAULTS

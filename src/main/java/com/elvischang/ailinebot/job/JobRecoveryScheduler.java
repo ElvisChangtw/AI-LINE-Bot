@@ -61,9 +61,9 @@ public class JobRecoveryScheduler implements SmartInitializingSingleton {
         long staleBefore = now - props.staleAfter().toMillis();
         for (Job job : jobs.expiredLeases(now)) {
             if (job.attempts() >= props.jobMaxAttempts()) {
-                jobs.fail(job.id(), BotReplies.JOB_FAILED, LEASE_EXPIRED, now);
+                jobs.fail(job.id(), BotReplies.JOB_FAILED, LEASE_EXPIRED, now, job.attempts());
             } else {
-                jobs.release(job.id(), LEASE_EXPIRED);
+                jobs.release(job.id(), LEASE_EXPIRED, job.attempts());
             }
             publisher.publishEvent(new JobReadyEvent(job.id()));
         }

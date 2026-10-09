@@ -48,7 +48,7 @@ class CleanupSchedulerTest extends IntegrationTestSupport {
 
         String waiting = jobs.insert(new NewJob(JobKind.FACT_CHECK, "Cg1", "1", "1", "q", "rt", "qt", null), start);
         jobs.claim(waiting, start, 1000);
-        jobs.complete(waiting, "結果", start);
+        jobs.complete(waiting, "結果", start, 1);
         jobs.markWaiting(List.of(waiting), start);
 
         clock.advance(Duration.ofDays(8));
@@ -76,7 +76,7 @@ class CleanupSchedulerTest extends IntegrationTestSupport {
 
         String waiting = jobs.insert(new NewJob(JobKind.FACT_CHECK, "Cg1", "1", "1", "q", "rt", "qt", null), start);
         jobs.claim(waiting, start, 1000);
-        jobs.complete(waiting, "結果", start);
+        jobs.complete(waiting, "結果", start, 1);
         jobs.markWaiting(List.of(waiting), start);
 
         clock.advance(Duration.ofDays(8));

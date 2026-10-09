@@ -46,7 +46,7 @@ class ReplySenderTest extends IntegrationTestSupport {
         long now = clock.millis();
         String id = jobs.insert(new NewJob(kind, "Cg1", "100", "99", "q", replyToken, quoteToken, null), now);
         jobs.claim(id, now, 60_000);
-        jobs.complete(id, result, now);
+        jobs.complete(id, result, now, 1);
         return id;
     }
 
@@ -154,7 +154,7 @@ class ReplySenderTest extends IntegrationTestSupport {
         long now = clock.millis();
         String id = jobs.insert(new NewJob(JobKind.IMAGINE, "Cg1", "100", "99", "q", "rt-1", "qt-100", null), now);
         jobs.claim(id, now, 60_000);
-        jobs.fail(id, BotReplies.JOB_FAILED, "X", now);
+        jobs.fail(id, BotReplies.JOB_FAILED, "X", now, 1);
 
         sender.send(id);
 

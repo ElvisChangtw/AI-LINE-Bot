@@ -161,7 +161,7 @@ class WebhookIngestServiceTest extends IntegrationTestSupport {
         long now = clock.millis();
         String id = jobs.insert(new NewJob(JobKind.FACT_CHECK, group, "1", "1", "q", "rt-old", "qt-1", null), now);
         jobs.claim(id, now, 1000);
-        jobs.complete(id, "結果", now);
+        jobs.complete(id, "結果", now, 1);
         jobs.markWaiting(List.of(id), now);
         return id;
     }
