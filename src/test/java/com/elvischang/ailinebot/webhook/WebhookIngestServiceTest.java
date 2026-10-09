@@ -4,6 +4,7 @@ import com.elvischang.ailinebot.delivery.BotReplies;
 import com.elvischang.ailinebot.job.ImageReceivedEvent;
 import com.elvischang.ailinebot.job.JobEventListener;
 import com.elvischang.ailinebot.job.JobReadyEvent;
+import com.elvischang.ailinebot.media.MediaStore;
 import com.elvischang.ailinebot.store.Job;
 import com.elvischang.ailinebot.store.JobKind;
 import com.elvischang.ailinebot.store.JobRepository;
@@ -20,6 +21,9 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static com.elvischang.ailinebot.support.Webhooks.body;
@@ -30,6 +34,7 @@ import static com.elvischang.ailinebot.support.Webhooks.groupText;
 import static com.elvischang.ailinebot.support.Webhooks.join;
 import static com.elvischang.ailinebot.support.Webhooks.parse;
 import static com.elvischang.ailinebot.support.Webhooks.unknownEvent;
+import static com.elvischang.ailinebot.support.Webhooks.unsend;
 import static com.elvischang.ailinebot.support.Webhooks.userText;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -44,6 +49,9 @@ class WebhookIngestServiceTest extends IntegrationTestSupport {
 
     @Autowired
     MaterialRepository materials;
+
+    @Autowired
+    MediaStore mediaStore;
 
     @Autowired
     ApplicationEvents events;
@@ -130,6 +138,20 @@ class WebhookIngestServiceTest extends IntegrationTestSupport {
     }
 
     @Test
+    void unsentMessageIsForgottenAndCannotBeChecked() throws Exception {
+        ingest.ingest(parse(body(groupText("e1", "Cg1", "99", "轉傳的訊息"))));
+        Path file = storedFile("Cg1", "99");
+        ingest.ingest(parse(body(unsend("e2", "Cg1", "99"))));
+        assertThat(materials.find("Cg1", "99")).isEmpty();
+        assertThat(file).doesNotExist();
+
+        ingest.ingest(parse(body(groupMention("e3", "Cg1", "100", "真的嗎", null))));
+        Job job = allJobs().getFirst();
+        assertThat(job.kind()).isEqualTo(JobKind.NOTICE);
+        assertThat(job.resultText()).isEqualTo(BotReplies.ASK_TO_QUOTE);
+    }
+
+    @Test
     void plainMessageCarriesWaitingResultsInADeliveryJob() {
         String waiting = waitingResult("Cg1");
         ingest.ingest(parse(body(groupText("e1", "Cg1", "100", "早安"))));
@@ -155,6 +177,12 @@ class WebhookIngestServiceTest extends IntegrationTestSupport {
         String waiting = waitingResult("Cg1");
         ingest.ingest(parse(body(groupText("e1", "Cg2", "100", "早安"))));
         assertThat(jobs.find(waiting).orElseThrow().sendState()).isEqualTo(SendState.WAITING_NEXT);
+    }
+
+    private Path storedFile(String group, String messageId) throws IOException {
+        Path file = mediaStore.pathFor(group, messageId);
+        Files.createDirectories(file.getParent());
+        return Files.writeString(file, "x");
     }
 
     private String waitingResult(String group) {

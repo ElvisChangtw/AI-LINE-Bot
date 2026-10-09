@@ -4,11 +4,13 @@ import com.elvischang.ailinebot.config.BotProperties;
 import com.elvischang.ailinebot.delivery.BotReplies;
 import com.elvischang.ailinebot.job.ImageReceivedEvent;
 import com.elvischang.ailinebot.job.JobReadyEvent;
+import com.elvischang.ailinebot.line.Hashes;
 import com.elvischang.ailinebot.line.LineSources;
 import com.elvischang.ailinebot.line.Mentions;
 import com.elvischang.ailinebot.material.MaterialResolver;
 import com.elvischang.ailinebot.material.Resolution;
 import com.elvischang.ailinebot.material.Trigger;
+import com.elvischang.ailinebot.media.MediaStore;
 import com.elvischang.ailinebot.store.InboundEventRepository;
 import com.elvischang.ailinebot.store.JobKind;
 import com.elvischang.ailinebot.store.JobRepository;
@@ -24,7 +26,10 @@ import com.linecorp.bot.webhook.model.ImageMessageContent;
 import com.linecorp.bot.webhook.model.JoinEvent;
 import com.linecorp.bot.webhook.model.MessageEvent;
 import com.linecorp.bot.webhook.model.TextMessageContent;
+import com.linecorp.bot.webhook.model.UnsendEvent;
 import com.linecorp.bot.webhook.model.VideoMessageContent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,21 +41,25 @@ import java.util.Optional;
 @Service
 public class WebhookIngestService {
 
+    private static final Logger log = LoggerFactory.getLogger(WebhookIngestService.class);
+
     private final InboundEventRepository inboundEvents;
     private final MaterialRepository materials;
     private final JobRepository jobs;
     private final MaterialResolver resolver;
+    private final MediaStore mediaStore;
     private final ApplicationEventPublisher publisher;
     private final BotProperties props;
     private final Clock clock;
 
     public WebhookIngestService(InboundEventRepository inboundEvents, MaterialRepository materials, JobRepository jobs,
-                                MaterialResolver resolver, ApplicationEventPublisher publisher,
+                                MaterialResolver resolver, MediaStore mediaStore, ApplicationEventPublisher publisher,
                                 BotProperties props, Clock clock) {
         this.inboundEvents = inboundEvents;
         this.materials = materials;
         this.jobs = jobs;
         this.resolver = resolver;
+        this.mediaStore = mediaStore;
         this.publisher = publisher;
         this.props = props;
         this.clock = clock;
@@ -64,6 +73,8 @@ public class WebhookIngestService {
                 ingestMessage(message, now);
             } else if (event instanceof JoinEvent join) {
                 ingestJoin(join, now);
+            } else if (event instanceof UnsendEvent unsend) {
+                ingestUnsend(unsend, now);
             }
         }
     }
@@ -93,6 +104,25 @@ public class WebhookIngestService {
         }
         createJob(new NewJob(JobKind.NOTICE, chat.get(), null, null, null,
                 event.replyToken(), null, BotReplies.JOIN_NOTICE), now);
+    }
+
+    private void ingestUnsend(UnsendEvent event, long now) {
+        Optional<String> chat = LineSources.chatId(event.source());
+        if (chat.isEmpty() || !isFirstDelivery(event.webhookEventId(), event.deliveryContext(), now)) {
+            return;
+        }
+        String messageId = event.unsend().messageId();
+        materials.delete(chat.get(), messageId);
+        deleteMedia(chat.get(), messageId);
+    }
+
+    private void deleteMedia(String chatId, String messageId) {
+        try {
+            mediaStore.delete(chatId, messageId);
+        } catch (RuntimeException e) {
+            log.warn("media delete failed groupHash={} messageId={} cause={}",
+                    Hashes.shortHash(chatId), messageId, e.getClass().getSimpleName());
+        }
     }
 
     private boolean isFirstDelivery(String webhookEventId, DeliveryContext context, long now) {
