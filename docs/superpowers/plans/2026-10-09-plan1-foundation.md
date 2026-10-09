@@ -27,6 +27,8 @@
 - `src/main` 裡不得出現任何 push API 呼叫（`pushMessage`、`multicast`、`broadcast`）。所有測試的 `@AfterEach` 會驗證 WireMock 收到的 push 請求數為 0。
 - 測試不用真 key、不連外網。LINE API 一律走 WireMock。
 - 資料存取只用 `JdbcClient`，不用 JPA。不能在 transaction 裡呼叫模型或 LINE API。
+- Hikari pool 大小刻意設 1：所有 DB 存取在 app 內排隊。log 裡看到等待連線是預期行為，不要把 pool 調大（SQLite 只有一個 writer）。
+- subagent 每開一個新 shell 都要重新 `export MVN=...`（見上一條 Maven 設定）。
 - 只存群組（`GroupSource`）和多人聊天室（`RoomSource`）的訊息；1:1 不存、不回。不存 LINE `userId` 和顯示名稱。
 - log 不得包含：訊息文字、回覆全文、reply token、quote token、任何 secret。群組只記 `Hashes.shortHash(groupId)`。
 - 給使用者看的文字只能放在 `BotReplies`（繁體中文）。
@@ -1881,7 +1883,7 @@ public class JobRepository {
     public int clearContent(long createdBefore) {
         return jdbc.sql("""
                         UPDATE job SET result_text = NULL, user_question = NULL
-                        WHERE created_at < :before AND send_state NOT IN ('NOT_SENT', 'CARRIED', 'WAITING_NEXT')
+                        WHERE created_at < :before AND send_state NOT IN ('NOT_SENT', 'CARRIED', 'WAITING_NEXT', 'SENDING_REPLY')
                           AND (result_text IS NOT NULL OR user_question IS NOT NULL)
                         """)
                 .param("before", createdBefore)
