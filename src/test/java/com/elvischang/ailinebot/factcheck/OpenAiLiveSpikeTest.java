@@ -19,7 +19,8 @@ class OpenAiLiveSpikeTest {
     @Test
     void structuredOutputWorksTogetherWithWebSearch() {
         FactCheckProperties props = liveProps("gpt-6-luna");
-        OpenAiResponsesFactChecker checker = new OpenAiResponsesFactChecker(props, new FactCheckPrompt(props));
+        OpenAiResponsesFactChecker checker = new OpenAiResponsesFactChecker(props, new FactCheckPrompt(props),
+                org.mockito.Mockito.mock(SpendRepository.class), java.time.Clock.systemUTC());
 
         ModelCheck check = checker.check(new FactCheckInput(
                 "被電話問到有沒有打疫苗？請不要按任何鍵。今早護理師按了1，手機就被屏蔽了，PayMe和網上銀行資訊都被轉移了。",

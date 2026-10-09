@@ -59,6 +59,8 @@ public abstract class IntegrationTestSupport {
         jdbc.sql("DELETE FROM job").update();
         jdbc.sql("DELETE FROM material").update();
         jdbc.sql("DELETE FROM inbound_event").update();
+        jdbc.sql("DELETE FROM verification_cache").update();
+        jdbc.sql("DELETE FROM spend_log").update();
         LINE.resetAll();
         clock.set(TestBeans.START);
         factChecks.reset();

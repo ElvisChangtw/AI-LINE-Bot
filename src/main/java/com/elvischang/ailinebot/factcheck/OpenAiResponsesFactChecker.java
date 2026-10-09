@@ -22,6 +22,7 @@ import com.openai.models.responses.WebSearchTool;
 import jakarta.annotation.PreDestroy;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashSet;
@@ -37,13 +38,18 @@ public class OpenAiResponsesFactChecker implements FactChecker {
     private final OpenAIClient client;
     private final FactCheckProperties props;
     private final FactCheckPrompt prompt;
+    private final SpendRepository spending;
+    private final Clock clock;
     private final ResponseFormatTextJsonSchemaConfig format;
     private final ObjectMapper mapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_TRAILING_TOKENS, true);
 
-    public OpenAiResponsesFactChecker(FactCheckProperties props, FactCheckPrompt prompt) {
+    public OpenAiResponsesFactChecker(FactCheckProperties props, FactCheckPrompt prompt,
+                                    SpendRepository spending, Clock clock) {
         this.props = props;
         this.prompt = prompt;
+        this.spending = spending;
+        this.clock = clock;
         this.client = OpenAIOkHttpClient.builder()
                 .baseUrl(props.baseUrl())
                 .apiKey(props.apiKey())
@@ -88,7 +94,9 @@ public class OpenAiResponsesFactChecker implements FactChecker {
         }
         long in = response.usage().map(u -> u.inputTokens()).orElse(0L);
         long out = response.usage().map(u -> u.outputTokens()).orElse(0L);
-        return new ModelCheck(parse(text.toString()), Set.copyOf(consulted), new Usage(in, out, searchCalls));
+        Usage usage = new Usage(in, out, searchCalls);
+        spending.record(clock.millis(), usage.costMicroUsd(props));
+        return new ModelCheck(parse(text.toString()), Set.copyOf(consulted), usage);
     }
 
     private ResponseCreateParams params(FactCheckInput input) {

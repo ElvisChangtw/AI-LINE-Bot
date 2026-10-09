@@ -1,8 +1,5 @@
 package com.elvischang.ailinebot.factcheck;
 
-import com.elvischang.ailinebot.store.JobKind;
-import com.elvischang.ailinebot.store.JobRepository;
-import com.elvischang.ailinebot.store.NewJob;
 import com.elvischang.ailinebot.support.IntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,13 +14,10 @@ class UsageGuardTest extends IntegrationTestSupport {
     UsageGuard guard;
 
     @Autowired
-    JobRepository jobs;
+    SpendRepository spending;
 
     private void spend(Instant at, long microUsd) {
-        clock.set(at);
-        String id = jobs.insert(new NewJob(JobKind.FACT_CHECK, "Cg1", "1", "1", "q", "rt", "qt", null), at.toEpochMilli());
-        jobs.claim(id, at.toEpochMilli(), 60_000);
-        jobs.recordFactCheck(id, 1, Verdict.CORRECT, new Usage(1, 1, 1), microUsd);
+        spending.record(at.toEpochMilli(), microUsd);
     }
 
     @Test

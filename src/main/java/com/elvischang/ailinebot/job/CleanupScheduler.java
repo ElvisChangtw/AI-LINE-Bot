@@ -1,6 +1,7 @@
 package com.elvischang.ailinebot.job;
 
 import com.elvischang.ailinebot.config.BotProperties;
+import com.elvischang.ailinebot.factcheck.SpendRepository;
 import com.elvischang.ailinebot.factcheck.VerificationCacheRepository;
 import com.elvischang.ailinebot.line.Hashes;
 import com.elvischang.ailinebot.media.MediaStore;
@@ -14,27 +15,32 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.time.Duration;
 
 @Component
 public class CleanupScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(CleanupScheduler.class);
+    private static final Duration SPEND_RETENTION = Duration.ofDays(40);
 
     private final MaterialRepository materials;
     private final JobRepository jobs;
     private final InboundEventRepository inboundEvents;
     private final MediaStore mediaStore;
     private final VerificationCacheRepository cache;
+    private final SpendRepository spending;
     private final BotProperties props;
     private final Clock clock;
 
     public CleanupScheduler(MaterialRepository materials, JobRepository jobs, InboundEventRepository inboundEvents,
-                            MediaStore mediaStore, VerificationCacheRepository cache, BotProperties props, Clock clock) {
+                            MediaStore mediaStore, VerificationCacheRepository cache,
+                            SpendRepository spending, BotProperties props, Clock clock) {
         this.materials = materials;
         this.jobs = jobs;
         this.inboundEvents = inboundEvents;
         this.mediaStore = mediaStore;
         this.cache = cache;
+        this.spending = spending;
         this.props = props;
         this.clock = clock;
     }
@@ -56,7 +62,8 @@ public class CleanupScheduler {
         int deletedJobs = jobs.deleteOlderThan(now - props.jobRetention().toMillis());
         int deletedEvents = inboundEvents.deleteOlderThan(now - props.materialTtl().toMillis());
         int deletedCache = cache.deleteExpired(now);
-        log.info("cleanup materials={} expiredWaiting={} clearedJobs={} deletedJobs={} deletedEvents={} deletedCache={}",
-                deletedMaterials, expiredWaiting, clearedJobs, deletedJobs, deletedEvents, deletedCache);
+        int deletedSpend = spending.deleteOlderThan(now - SPEND_RETENTION.toMillis());
+        log.info("cleanup materials={} expiredWaiting={} clearedJobs={} deletedJobs={} deletedEvents={} deletedCache={} deletedSpend={}",
+                deletedMaterials, expiredWaiting, clearedJobs, deletedJobs, deletedEvents, deletedCache, deletedSpend);
     }
 }

@@ -30,6 +30,9 @@ class OpenAiResponsesFactCheckerTest extends IntegrationTestSupport {
     @Autowired
     OpenAiResponsesFactChecker checker;
 
+    @Autowired
+    SpendRepository spending;
+
     static String fixture(String name) throws Exception {
         return new ClassPathResource("openai/" + name).getContentAsString(StandardCharsets.UTF_8);
     }
@@ -39,6 +42,10 @@ class OpenAiResponsesFactCheckerTest extends IntegrationTestSupport {
         ObjectNode root = (ObjectNode) mapper.readTree(fixture("response-vaccine.json"));
         ((ObjectNode) root.get("output").get(2).get("content").get(0)).put("text", outputText);
         return mapper.writeValueAsString(root);
+    }
+
+    private java.util.List<Long> spendRows() {
+        return jdbc.sql("SELECT micro_usd FROM spend_log").query(Long.class).list();
     }
 
     private FactCheckInput textInput(String text) {
@@ -82,6 +89,7 @@ class OpenAiResponsesFactCheckerTest extends IntegrationTestSupport {
                 "https://en.cofacts.tw/article/2xegenmqt9ehy",
                 "https://www.mygopen.com/2021/09/vaccine-call.html");
         assertThat(check.usage()).isEqualTo(new Usage(20_000, 4_000, 1));
+        assertThat(spendRows()).containsExactly(14_000L);
     }
 
     @Test
@@ -119,6 +127,7 @@ class OpenAiResponsesFactCheckerTest extends IntegrationTestSupport {
             LINE.stubFor(post(urlEqualTo(RESPONSES)).willReturn(okJson(withOutputText(output))));
             assertThatThrownBy(() -> checker.check(textInput("x"))).isInstanceOf(InvalidModelOutputException.class);
         }
+        assertThat(spendRows()).containsOnly(14_000L).hasSize(bad.length);
     }
 
     @Test

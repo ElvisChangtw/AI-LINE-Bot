@@ -270,11 +270,4 @@ public class JobRepository {
                 .param("attempt", attempt)
                 .update();
     }
-
-    public long sumCostSince(long since) {
-        return jdbc.sql("SELECT COALESCE(SUM(cost_micro_usd), 0) FROM job WHERE created_at >= :since")
-                .param("since", since)
-                .query(Long.class)
-                .single();
-    }
 }

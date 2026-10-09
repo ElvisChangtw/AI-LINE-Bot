@@ -58,7 +58,12 @@ public class VerificationCacheRepository {
 
     private Optional<FactCheckResult> read(String json) {
         try {
-            return Optional.of(mapper.readValue(json, FactCheckResult.class));
+            FactCheckResult result = mapper.readValue(json, FactCheckResult.class);
+            if (result == null || result.overall() == null || result.claims() == null || result.sources() == null) {
+                log.warn("ignoring unreadable cache entry cause=incomplete");
+                return Optional.empty();
+            }
+            return Optional.of(result);
         } catch (JsonProcessingException e) {
             log.warn("ignoring unreadable cache entry cause={}", e.getClass().getSimpleName());
             return Optional.empty();

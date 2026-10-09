@@ -193,7 +193,5 @@ class JobRepositoryTest extends IntegrationTestSupport {
                 .param("id", id).query((rs, n) -> rs.getString(1) + "/" + rs.getLong(2) + "/" + rs.getLong(3)
                         + "/" + rs.getInt(4) + "/" + rs.getLong(5)).single())
                 .isEqualTo("INCORRECT/10/20/3/500");
-        assertThat(jobs.sumCostSince(0)).isEqualTo(500);
-        assertThat(jobs.sumCostSince(101)).isZero();
     }
 }
