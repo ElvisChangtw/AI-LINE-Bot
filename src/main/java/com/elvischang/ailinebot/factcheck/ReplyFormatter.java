@@ -8,6 +8,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public final class ReplyFormatter {
 
@@ -16,6 +17,7 @@ public final class ReplyFormatter {
     private static final int MAX_SOURCES = 2;
     private static final String PREFIX = "【查證結果】";
     private static final String BULLET = "・";
+    private static final Pattern LINK = Pattern.compile("(https?://|www\\.)\\S+", Pattern.CASE_INSENSITIVE);
     private static final Map<Verdict, String> LABELS = new EnumMap<>(Map.of(
             Verdict.CORRECT, "內容正確",
             Verdict.INCORRECT, "這是假消息",
@@ -28,12 +30,12 @@ public final class ReplyFormatter {
     }
 
     public static String format(FactCheckResult result, boolean materialHasLink) {
-        String header = PREFIX + LABELS.get(result.overall())
-                + (result.headline() == null || result.headline().isBlank() ? "" : "，" + result.headline().trim());
+        String headline = withoutLinks(result.headline());
+        String header = PREFIX + LABELS.get(result.overall()) + (headline.isEmpty() ? "" : "，" + headline);
         List<String> reasons = new ArrayList<>(result.claims().stream()
-                .map(FactCheckResult.Claim::reason)
-                .filter(reason -> reason != null && !reason.isBlank())
-                .map(reason -> BULLET + reason.trim())
+                .map(claim -> withoutLinks(claim.reason()))
+                .filter(reason -> !reason.isEmpty())
+                .map(reason -> BULLET + reason)
                 .limit(MAX_REASONS)
                 .toList());
         if (reasons.isEmpty() && result.overall() == Verdict.INSUFFICIENT_EVIDENCE) {
@@ -65,6 +67,10 @@ public final class ReplyFormatter {
             text = join(header, reasons, notes, sources);
         }
         return text.length() > MAX_LENGTH ? text.substring(0, MAX_LENGTH - 1) + "…" : text;
+    }
+
+    private static String withoutLinks(String modelText) {
+        return modelText == null ? "" : LINK.matcher(modelText).replaceAll("").trim();
     }
 
     private static String sourceBlock(FactCheckResult.Source source) {

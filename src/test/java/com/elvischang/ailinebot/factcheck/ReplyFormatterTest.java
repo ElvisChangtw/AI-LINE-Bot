@@ -51,6 +51,21 @@ class ReplyFormatterTest {
     }
 
     @Test
+    void stripsLinksFromTheModelsOwnWords() {
+        FactCheckResult withLinks = new FactCheckResult(Verdict.INCORRECT, false, "點這裡 https://evil.example/x 領補助",
+                List.of(new FactCheckResult.Claim("a", Verdict.INCORRECT, "請加 www.evil.example"),
+                        new FactCheckResult.Claim("b", Verdict.INCORRECT, "https://evil.example/only")),
+                false, List.of(TFC));
+
+        String text = ReplyFormatter.format(withLinks, false);
+
+        assertThat(text).doesNotContain("evil.example")
+                .contains("・請加\n")
+                .doesNotContain("・\n")
+                .contains(TFC.url());
+    }
+
+    @Test
     void insufficientEvidenceSaysSoPlainly() {
         FactCheckResult nothing = new FactCheckResult(Verdict.INSUFFICIENT_EVIDENCE, false, "", List.of(), false, List.of());
         assertThat(ReplyFormatter.format(nothing, false))
