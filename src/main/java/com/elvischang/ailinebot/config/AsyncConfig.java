@@ -29,6 +29,8 @@ public class AsyncConfig {
         executor.setCorePoolSize(threads);
         executor.setMaxPoolSize(threads);
         executor.setQueueCapacity(queueCapacity);
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
         executor.setRejectedExecutionHandler((task, pool) ->
                 log.warn("executor {} queue full; recovery sweep will pick the task up", prefix));
         return executor;

@@ -5,8 +5,13 @@ line:
     connect-timeout: 5s
     read-timeout: 15s
 
+server:
+  shutdown: graceful
+
 # 2) Spring AI / OpenAI
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   datasource:
     url: jdbc:sqlite:${BOT_DB_PATH:/data/app.db}?journal_mode=WAL
     hikari:
