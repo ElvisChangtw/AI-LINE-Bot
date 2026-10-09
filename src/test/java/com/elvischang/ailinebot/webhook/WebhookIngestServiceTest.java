@@ -200,10 +200,39 @@ class WebhookIngestServiceTest extends IntegrationTestSupport {
     }
 
     @Test
+    void plainMessageCarriesAtMostFiveWaitingResults() {
+        for (int i = 0; i < 6; i++) {
+            waitingResult("Cg1");
+        }
+        ingest.ingest(parse(body(groupText("e1", "Cg1", "100", "早安"))));
+
+        Job delivery = allJobs().stream().filter(j -> j.kind() == JobKind.DELIVERY).findFirst().orElseThrow();
+        assertThat(jobs.carried(delivery.id())).hasSize(5);
+        assertThat(waitingCount("Cg1")).isEqualTo(1);
+    }
+
+    @Test
+    void mentionCarriesAtMostFourWaitingResultsBesideItsOwnReply() {
+        for (int i = 0; i < 6; i++) {
+            waitingResult("Cg1");
+        }
+        ingest.ingest(parse(body(groupMention("e1", "Cg1", "100", "真的嗎", null))));
+
+        Job notice = allJobs().stream().filter(j -> j.kind() == JobKind.NOTICE).findFirst().orElseThrow();
+        assertThat(jobs.carried(notice.id())).hasSize(4);
+        assertThat(waitingCount("Cg1")).isEqualTo(2);
+    }
+
+    @Test
     void messagesInOtherGroupsDoNotCarryWaitingResults() {
         String waiting = waitingResult("Cg1");
         ingest.ingest(parse(body(groupText("e1", "Cg2", "100", "早安"))));
         assertThat(jobs.find(waiting).orElseThrow().sendState()).isEqualTo(SendState.WAITING_NEXT);
+    }
+
+    private int waitingCount(String group) {
+        return jdbc.sql("SELECT COUNT(*) FROM job WHERE group_id = :g AND send_state = 'WAITING_NEXT'")
+                .param("g", group).query(Integer.class).single();
     }
 
     private Path storedFile(String group, String messageId) throws IOException {

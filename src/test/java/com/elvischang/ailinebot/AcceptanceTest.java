@@ -12,13 +12,14 @@ import java.util.concurrent.Executors;
 
 import static com.elvischang.ailinebot.support.Webhooks.body;
 import static com.elvischang.ailinebot.support.Webhooks.groupAudio;
+import static com.elvischang.ailinebot.support.Webhooks.groupImage;
 import static com.elvischang.ailinebot.support.Webhooks.groupMention;
 import static com.elvischang.ailinebot.support.Webhooks.groupText;
 import static com.elvischang.ailinebot.support.Webhooks.userText;
-import static com.github.tomakehurst.wiremock.client.WireMock.anyRequestedFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.anyUrl;
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
@@ -39,18 +40,25 @@ class AcceptanceTest extends IntegrationTestSupport {
                 .param("g", groupId).param("m", messageId).query(String.class).optional().orElse(null);
     }
 
+    private String mediaStatus(String groupId, String messageId) {
+        return jdbc.sql("SELECT media_status FROM material WHERE group_id = :g AND message_id = :m")
+                .param("g", groupId).param("m", messageId).query(String.class).optional().orElse(null);
+    }
+
     @Test
     void plainGroupMessagesAndOneOnOneChatsNeverCallTheModelOrLine() throws Exception {
+        LINE.stubFor(get(urlEqualTo("/v2/bot/message/103/content")).willReturn(aResponse().withStatus(200).withBody("img")));
         postWebhook(body(groupText("e1", "Cg1", "100", "轉傳的訊息"), groupAudio("e2", "Cg1", "101"),
-                userText("e3", "U1", "102", "私訊")));
+                userText("e3", "U1", "102", "私訊"), groupImage("e4", "Cg1", "103")));
 
         assertThat(jdbc.sql("SELECT COUNT(*) FROM job").query(Integer.class).single()).isZero();
         assertThat(materialKind("Cg1", "100")).isEqualTo("TEXT");
         assertThat(materialKind("Cg1", "101")).isEqualTo("AUDIO");
         assertThat(jdbc.sql("SELECT COUNT(*) FROM material WHERE message_id = '102'").query(Integer.class).single()).isZero();
+        await().atMost(Duration.ofSeconds(5)).until(() -> "STORED".equals(mediaStatus("Cg1", "103")));
         await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             assertThat(factChecks.calls()).isEmpty();
-            LINE.verify(0, anyRequestedFor(anyUrl()));
+            LINE.verify(0, postRequestedFor(urlEqualTo(REPLY)));
         });
     }
 
