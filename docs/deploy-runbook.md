@@ -5,7 +5,7 @@
 ## 0. 先確認
 
 - push `main` 之前：確認 Render 上沒有綁這個 repo、開著 auto-deploy 的舊服務（README 以前寫部署在 Render）。有的話先關 auto-deploy 或刪掉服務，否則 push 會部署舊式設定。
-- 用**個人** AWS 帳號。`~/.aws` 的 `default` profile 是公司帳號，`infra/aws/setup.sh` 會拒絕它。
+- 用**個人** AWS 帳號（2026-10-10 起本機 `default` 是個人帳號，公司的改名為 `sporty`）。`infra/aws/setup.sh` 會比對 `EXPECTED_ACCOUNT_ID`，帳號不符就停。
 
 ## 1. 網域與 Cloudflare Tunnel
 

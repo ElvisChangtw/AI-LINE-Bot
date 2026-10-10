@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Creates the AWS resources for deployment; safe to re-run. Run only with an explicit personal profile.
+# Creates the AWS resources for deployment; safe to re-run. EXPECTED_ACCOUNT_ID guards against the wrong account.
 # Usage: AWS_PROFILE=<personal> AWS_REGION=ap-northeast-1 EXPECTED_ACCOUNT_ID=<12 digits> ALERT_EMAIL=<you@example.com> \
 #        [SSM_INSTANCE_ID=mi-...] bash infra/aws/setup.sh [--activation]
 # Re-run with SSM_INSTANCE_ID once the host is registered, to limit deploys to that one host.
@@ -7,7 +7,6 @@ set -euo pipefail
 
 : "${AWS_PROFILE:?set AWS_PROFILE to your personal profile}" "${AWS_REGION:?set AWS_REGION}"
 : "${EXPECTED_ACCOUNT_ID:?set EXPECTED_ACCOUNT_ID}" "${ALERT_EMAIL:?set ALERT_EMAIL}"
-[[ "$AWS_PROFILE" != "default" ]] || { echo "setup: the default profile is the company account; refusing" >&2; exit 1; }
 export AWS_PROFILE AWS_REGION AWS_PAGER=""
 
 GITHUB_REPO="ElvisChangtw/AI-LINE-Bot"
