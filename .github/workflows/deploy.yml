@@ -27,20 +27,34 @@ jobs:
       ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
       SSM_INSTANCE_ID: ${{ vars.SSM_INSTANCE_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.sha || github.sha }}
+          fetch-depth: 0
 
-      - name: Resolve the commit
+      - name: Only deploy commits that are on main
         id: commit
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          sha="$(git rev-parse HEAD)"
+          git merge-base --is-ancestor "$sha" origin/main || { echo "$sha is not on main"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      # Tests run before any AWS credentials exist in the job.
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Test
+        run: mvn -B verify
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - uses: aws-actions/amazon-ecr-login@v2
+      - uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
         id: ecr
 
       - name: Check whether the image already exists
@@ -53,17 +67,6 @@ jobs:
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
-
-      - uses: actions/setup-java@v4
-        if: steps.image.outputs.exists == 'false'
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-
-      - name: Test
-        if: steps.image.outputs.exists == 'false'
-        run: mvn -B verify
 
       - name: Build and push the image
         if: steps.image.outputs.exists == 'false'
@@ -81,8 +84,10 @@ jobs:
           compose_b64="$(base64 -w0 infra/host/docker-compose.yml)"
           deploy_b64="$(base64 -w0 infra/host/deploy.sh)"
           backup_b64="$(base64 -w0 infra/host/backup.sh)"
-          jq -n --arg c "$compose_b64" --arg d "$deploy_b64" --arg b "$backup_b64" --arg sha "$SHA" '{commands: [
+          # The host gives up after 540 s, before this job stops polling at 600 s.
+          jq -n --arg c "$compose_b64" --arg d "$deploy_b64" --arg b "$backup_b64" --arg sha "$SHA" '{executionTimeout: ["540"], commands: [
             "set -eu",
+            "export HOME=/root",
             "echo \($c) | base64 -d > /opt/linebot/docker-compose.yml",
             "echo \($d) | base64 -d > /opt/linebot/deploy.sh",
             "echo \($b) | base64 -d > /opt/linebot/backup.sh",
@@ -95,7 +100,7 @@ jobs:
           echo "command $command_id"
 
           # `aws ssm wait` gives up after 100 seconds and cannot tell a timeout from a failure, so poll ourselves.
-          deadline=$((SECONDS + 300))
+          deadline=$((SECONDS + 600))
           status=""
           code=""
           while (( SECONDS < deadline )); do

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Creates the AWS resources for deployment; safe to re-run. Run only with an explicit personal profile.
 # Usage: AWS_PROFILE=<personal> AWS_REGION=ap-northeast-1 EXPECTED_ACCOUNT_ID=<12 digits> ALERT_EMAIL=<you@example.com> \
-#        bash infra/aws/setup.sh [--activation]
+#        [SSM_INSTANCE_ID=mi-...] bash infra/aws/setup.sh [--activation]
+# Re-run with SSM_INSTANCE_ID once the host is registered, to limit deploys to that one host.
 set -euo pipefail
 
 : "${AWS_PROFILE:?set AWS_PROFILE to your personal profile}" "${AWS_REGION:?set AWS_REGION}"
@@ -41,6 +42,8 @@ if ! aws iam get-open-id-connect-provider --open-id-connect-provider-arn "$OIDC_
     --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1 >/dev/null
 fi
 
+TARGET_INSTANCES="arn:aws:ssm:${AWS_REGION}:${ACCOUNT}:managed-instance/${SSM_INSTANCE_ID:-*}"
+
 echo "== deploy role (GitHub Actions, main branch only)"
 # Deploy jobs must not use `environment:`, or the sub claim stops matching the branch condition.
 DEPLOY_TRUST=$(cat <<JSON
@@ -64,14 +67,22 @@ aws iam put-role-policy --role-name "$DEPLOY_ROLE" --policy-name deploy --policy
    "Resource": "arn:aws:ecr:${AWS_REGION}:${ACCOUNT}:repository/${NAME}"},
   {"Effect": "Allow", "Action": "ssm:SendCommand",
    "Resource": ["arn:aws:ssm:${AWS_REGION}::document/AWS-RunShellScript",
-                "arn:aws:ssm:${AWS_REGION}:${ACCOUNT}:managed-instance/*"]},
+                "${TARGET_INSTANCES}"]},
   {"Effect": "Allow", "Action": "ssm:GetCommandInvocation", "Resource": "*"}]}
 JSON
 )"
 
 echo "== SSM service role (host: read ECR, write CloudWatch)"
-SSM_TRUST='{"Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Principal": {"Service": "ssm.amazonaws.com"}, "Action": "sts:AssumeRole"}]}'
-if ! role_exists "$SSM_ROLE"; then
+SSM_TRUST=$(cat <<JSON
+{"Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Principal": {"Service": "ssm.amazonaws.com"},
+  "Action": "sts:AssumeRole",
+  "Condition": {"StringEquals": {"aws:SourceAccount": "${ACCOUNT}"},
+                "ArnEquals": {"aws:SourceArn": "arn:aws:ssm:${AWS_REGION}:${ACCOUNT}:*"}}}]}
+JSON
+)
+if role_exists "$SSM_ROLE"; then
+  aws iam update-assume-role-policy --role-name "$SSM_ROLE" --policy-document "$SSM_TRUST"
+else
   aws iam create-role --role-name "$SSM_ROLE" --assume-role-policy-document "$SSM_TRUST" >/dev/null
 fi
 for policy in AmazonSSMManagedInstanceCore AmazonEC2ContainerRegistryReadOnly CloudWatchAgentServerPolicy; do

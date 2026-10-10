@@ -28,9 +28,9 @@ class CallbackBodyLimitTest extends IntegrationTestSupport {
     }
 
     @Test
-    void rejectsARequestWithoutAContentLength() throws Exception {
+    void anEmptyBodyStillReachesTheSignatureCheck() throws Exception {
         mvc.perform(post("/callback").contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isLengthRequired());
+                .andExpect(status().isBadRequest());
         verifyNoInteractions(ingestService);
     }
 

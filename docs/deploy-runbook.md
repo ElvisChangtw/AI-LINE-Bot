@@ -15,6 +15,7 @@
    - Subdomain `bot`、Domain 選剛買的網域
    - Path：`^/callback$`
    - Service：`HTTP`、URL：`app:8080`
+4. Security → Bots：如果開了 Bot Fight Mode，LINE 的 POST 可能被擋成 challenge。到 Security → WAF 加一條 custom rule：`URI Path equals /callback` → Skip（勾 Bot Fight Mode 與所有 managed rules）。
 
 ## 2. AWS 資源
 
@@ -26,6 +27,7 @@ AWS_PROFILE=<個人 profile> AWS_REGION=ap-northeast-1 EXPECTED_ACCOUNT_ID=<12 �
 
 - 記下輸出的 `SSM_ACTIVATION_ID`、`SSM_ACTIVATION_CODE`（24 小時內有效）、`ECR_REPO`、GitHub variables。
 - 去信箱點 SNS 的訂閱確認信，否則收不到告警。
+- 主機還沒裝好之前，記憶體／硬碟告警會因為「沒有資料」而發 ALARM 信，這是預期的；第 3 步做完、agent 開始回報後會自己恢復 OK。
 
 ## 3. Lightsail 主機
 
@@ -37,6 +39,13 @@ AWS_PROFILE=<個人 profile> AWS_REGION=ap-northeast-1 EXPECTED_ACCOUNT_ID=<12 �
 ```bash
 sudo SSM_ACTIVATION_ID=<...> SSM_ACTIVATION_CODE=<...> AWS_REGION=ap-northeast-1 \
   ECR_REPO=<第 2 步的 ECR_REPO> bash bootstrap.sh
+```
+
+註冊完成後，到 Systems Manager → Fleet Manager 找到 `mi-` 開頭的 ID，重跑一次 setup.sh，把部署權限限縮到這一台：
+
+```bash
+AWS_PROFILE=<個人 profile> AWS_REGION=ap-northeast-1 EXPECTED_ACCOUNT_ID=<...> ALERT_EMAIL=<...> \
+  SSM_INSTANCE_ID=mi-xxxxxxxx bash infra/aws/setup.sh
 ```
 
 ## 4. 主機上的 secret
@@ -66,7 +75,7 @@ Settings → Secrets and variables → Actions → **Variables**：
 
 1. 用 LINE **測試 channel** 先驗：Messaging API → Webhook URL 填 `https://bot.<網域>/callback` → Verify 要顯示 Success。
 2. 實測 spec §18 列的未驗證項目：引用圖片時 `quotedMessageId`、`quoteToken` 有效期、一次回多則訊息的呈現。
-3. 沒問題再改正式 channel 的 webhook，並開 Webhook redelivery。
+3. 沒問題再改正式 channel 的 webhook，並**一定要開 Webhook redelivery**：每次部署會有 20–90 秒 app 不在線，沒開 redelivery 的話這段時間的訊息會遺失。
 
 ## 7. OpenAI
 
@@ -82,4 +91,16 @@ mvn test -Dgroups=live -Dtest.excludedGroups=none -Dtest=EvalRunTest
 
 - 看 log：Lightsail SSH → `sudo docker compose -p linebot -f /opt/linebot/docker-compose.yml logs --tail 200 app`
 - 手動 rollback：`sudo /opt/linebot/deploy.sh <舊 sha>`
-- 備份在 `/var/backups/linebot/`；還原前先停 app：`sudo docker compose -p linebot -f /opt/linebot/docker-compose.yml stop app`
+- 從備份還原（備份在 `/var/backups/linebot/app-YYYY-MM-DD.db`）：
+
+```bash
+cd /opt/linebot
+sudo docker compose -p linebot -f docker-compose.yml stop app
+V=/var/lib/docker/volumes/linebot_app-data/_data
+sudo rm -f $V/app.db-wal $V/app.db-shm
+sudo cp /var/backups/linebot/app-2026-10-10.db $V/app.db
+sudo chown 10001:10001 $V/app.db
+sudo docker compose -p linebot -f docker-compose.yml start app
+```
+
+- 部署 log 寫「cloudflared is not running」：app 已經是新版，問題在 `tunnel.env` 的 token；改好後 `sudo docker compose -p linebot -f /opt/linebot/docker-compose.yml up -d cloudflared`。

@@ -5,11 +5,14 @@ set -euo pipefail
 
 : "${AWS_REGION:?set AWS_REGION}" "${ECR_REPO:?set ECR_REPO}"
 HOST_NAME="${HOST_NAME:-ai-line-bot}"
+SSM_ROLE_MARKER=":assumed-role/ai-line-bot-ssm/"
 DIR=/opt/linebot
 [[ $EUID -eq 0 ]] || { echo "bootstrap: run as root" >&2; exit 1; }
 
 echo "== packages"
+# The CloudWatch alarms filter on this host name, so keep cloud-init from resetting it on reboot.
 hostnamectl set-hostname "$HOST_NAME"
+printf 'preserve_hostname: true\n' > /etc/cloud/cloud.cfg.d/99-preserve-hostname.cfg
 apt-get update -q
 apt-get install -y -q docker.io docker-compose-v2 sqlite3 curl unzip
 systemctl enable --now docker
@@ -25,7 +28,9 @@ fi
 
 echo "== ssm agent (hybrid activation)"
 # The agent writes its role credentials into root's [default] profile, so never run `aws configure` as root.
-if aws sts get-caller-identity >/dev/null 2>&1; then
+# Other credential sources may exist on Lightsail, so only our SSM role counts as registered.
+registered() { aws sts get-caller-identity --query Arn --output text 2>/dev/null | grep -qF "$SSM_ROLE_MARKER"; }
+if registered; then
   echo "already registered"
 else
   : "${SSM_ACTIVATION_ID:?set SSM_ACTIVATION_ID}" "${SSM_ACTIVATION_CODE:?set SSM_ACTIVATION_CODE}"
@@ -44,10 +49,10 @@ else
     systemctl enable --now amazon-ssm-agent
   fi
   for _ in $(seq 1 30); do
-    aws sts get-caller-identity >/dev/null 2>&1 && break
+    registered && break
     sleep 3
   done
-  aws sts get-caller-identity >/dev/null || { echo "bootstrap: ssm credentials never appeared in [default]" >&2; exit 1; }
+  registered || { echo "bootstrap: ssm role credentials never appeared in [default]" >&2; exit 1; }
 fi
 aws sts get-caller-identity --query Arn --output text
 

@@ -5,7 +5,7 @@ set -euo pipefail
 SHA="${1:?usage: deploy.sh <git sha>}"
 [[ "$SHA" =~ ^[0-9a-f]{7,40}$ ]] || { echo "deploy: not a git sha: $SHA" >&2; exit 2; }
 
-DIR=/opt/linebot
+DIR="${LINEBOT_DIR:-/opt/linebot}"
 HEALTH_TIMEOUT_SECONDS=90
 cd "$DIR"
 # shellcheck source=/dev/null
@@ -26,9 +26,17 @@ healthy() {
   return 1
 }
 
+# Start the app on its own and wait ourselves, so compose versions that wait on depends_on cannot hang the deploy.
 switch_to() {
   export APP_TAG="$1"
-  compose up -d --remove-orphans
+  compose up -d --no-deps app && healthy && compose up -d --no-deps --remove-orphans cloudflared
+}
+
+keep_only() {
+  local image
+  for image in $(docker image ls "$ECR_REPO" --format '{{.Tag}}'); do
+    [[ " $* " == *" $image "* ]] || docker image rm "$ECR_REPO:$image" >/dev/null || true
+  done
 }
 
 aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "${ECR_REPO%%/*}"
@@ -37,10 +45,15 @@ PREVIOUS="$(cat "$DIR/current-tag" 2>/dev/null || true)"
 export APP_TAG="$SHA"
 compose pull app
 
-# compose up itself fails when the app never turns healthy (cloudflared waits on it), so check both together.
-if switch_to "$SHA" && healthy; then
+if switch_to "$SHA"; then
   echo "$SHA" > "$DIR/current-tag"
-  docker image prune -f >/dev/null
+  keep_only "$SHA" "$PREVIOUS"
+  sleep 10
+  if [[ -z "$(compose ps -q --status running cloudflared)" ]]; then
+    echo "deploy: $SHA is healthy but cloudflared is not running; check TUNNEL_TOKEN in tunnel.env" >&2
+    compose logs --tail 30 cloudflared >&2 || true
+    exit 1
+  fi
   echo "deploy: $SHA is healthy"
   exit 0
 fi
@@ -48,7 +61,7 @@ fi
 echo "deploy: $SHA did not become healthy within ${HEALTH_TIMEOUT_SECONDS}s" >&2
 compose logs --tail 50 app >&2 || true
 if [[ -n "$PREVIOUS" && "$PREVIOUS" != "$SHA" ]]; then
-  if switch_to "$PREVIOUS" && healthy; then
+  if switch_to "$PREVIOUS"; then
     echo "deploy: rolled back to $PREVIOUS" >&2
   else
     echo "deploy: rollback to $PREVIOUS is not healthy either" >&2
