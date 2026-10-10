@@ -41,8 +41,12 @@ class EvalRunTest {
         StringBuilder replies = new StringBuilder();
         int matches = 0;
         int errors = 0;
+        String only = System.getProperty("eval.ids", "");
         for (JsonNode sample : samples) {
             String id = sample.get("id").asText();
+            if (!only.isEmpty() && !java.util.List.of(only.split(",")).contains(id)) {
+                continue;
+            }
             String expected = expected(sample);
             String actual;
             int searches = 0;
@@ -57,6 +61,7 @@ class EvalRunTest {
                 searches = check.usage().searchCalls();
                 reply = ReplyFormatter.format(filtered, false);
             } catch (RuntimeException e) {
+                System.err.println("eval " + id + " failed: " + e);
                 errors++;
                 actual = "ERROR:" + e.getClass().getSimpleName();
                 reply = actual;
