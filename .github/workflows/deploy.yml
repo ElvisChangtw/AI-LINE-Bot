@@ -42,6 +42,8 @@ jobs:
           java-version: '21'
           cache: maven
 
+      - name: Install ffmpeg (video frame tests use it)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - name: Test
         run: mvn -B verify
 

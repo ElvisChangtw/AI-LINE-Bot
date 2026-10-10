@@ -159,10 +159,17 @@ class MediaTranscriberTest extends IntegrationTestSupport {
         LINE.verify(0, postRequestedFor(urlEqualTo(TRANSCRIBE)));
     }
 
+    private static boolean ffmpegInstalled() {
+        try {
+            return new ProcessBuilder("ffmpeg", "-version").redirectErrorStream(true).start().waitFor() == 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     @Test
     void aRealVideoKeepsFramesFromTheWholeClipInsteadOfLinesPreview() throws Exception {
-        org.junit.jupiter.api.Assumptions.assumeTrue(
-                new ProcessBuilder("ffmpeg", "-version").start().waitFor() == 0, "ffmpeg not installed");
+        org.junit.jupiter.api.Assumptions.assumeTrue(ffmpegInstalled(), "ffmpeg not installed");
         Material video = put("370", MaterialKind.VIDEO, MediaStatus.NONE);
         byte[] clip = java.nio.file.Files.readAllBytes(java.nio.file.Path.of(getClass().getResource("/video/tiny.mp4").toURI()));
         LINE.stubFor(get(urlEqualTo("/v2/bot/message/370/content/transcoding")).willReturn(okJson("{\"status\":\"succeeded\"}")));
