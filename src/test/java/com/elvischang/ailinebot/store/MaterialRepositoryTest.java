@@ -35,7 +35,7 @@ class MaterialRepositoryTest extends IntegrationTestSupport {
     @Test
     void recentCandidatesExcludeTriggersBotRepliesOldAndOtherGroups() {
         materials.insert(text("Cg1", "old", 10, false));
-        materials.insert(text("Cg1", "a", 100, false), "h1");
+        materials.insert(text("Cg1", "a", 100, false), "U1");
         materials.insert(text("Cg1", "trigger", 110, true));
         materials.insert(new Material("Cg1", "bot", MaterialKind.BOT_REPLY, null, false, MediaStatus.NONE, null, 0, 120, 999));
         materials.insert(text("Cg2", "other", 130, false));
@@ -43,7 +43,7 @@ class MaterialRepositoryTest extends IntegrationTestSupport {
         materials.insert(text("Cg1", "afterTheTrigger", 200, false));
 
         assertThat(materials.recentCandidates("Cg1", 50, 150, "self"))
-                .extracting(r -> r.material().messageId(), RecentMessage::senderHash).containsExactly(tuple("a", "h1"));
+                .extracting(r -> r.material().messageId(), RecentMessage::senderId).containsExactly(tuple("a", "U1"));
     }
 
     @Test

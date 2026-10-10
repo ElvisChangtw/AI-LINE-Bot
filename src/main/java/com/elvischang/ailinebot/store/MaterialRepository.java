@@ -33,14 +33,14 @@ public class MaterialRepository {
         insert(m, null);
     }
 
-    public void insert(Material m, String senderHash) {
+    public void insert(Material m, String senderId) {
         jdbc.sql("""
                         INSERT OR IGNORE INTO material(group_id, message_id, kind, text, is_bot_trigger, media_status,
-                                                       media_sha256, media_attempts, created_at, expires_at, sender_hash)
+                                                       media_sha256, media_attempts, created_at, expires_at, sender_id)
                         VALUES (:groupId, :messageId, :kind, :text, :botTrigger, :mediaStatus,
                                 :sha, :attempts, :createdAt, :expiresAt, :sender)
                         """)
-                .param("sender", senderHash)
+                .param("sender", senderId)
                 .param("groupId", m.groupId())
                 .param("messageId", m.messageId())
                 .param("kind", m.kind().name())
@@ -88,7 +88,7 @@ public class MaterialRepository {
                 .param("since", since)
                 .param("until", until)
                 .param("exclude", excludeMessageId)
-                .query((rs, n) -> new RecentMessage(MAPPER.mapRow(rs, n), rs.getString("sender_hash")))
+                .query((rs, n) -> new RecentMessage(MAPPER.mapRow(rs, n), rs.getString("sender_id")))
                 .list();
     }
 

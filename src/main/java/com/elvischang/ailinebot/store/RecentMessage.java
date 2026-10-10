@@ -1,4 +1,4 @@
 package com.elvischang.ailinebot.store;
 
-public record RecentMessage(Material material, String senderHash) {
+public record RecentMessage(Material material, String senderId) {
 }

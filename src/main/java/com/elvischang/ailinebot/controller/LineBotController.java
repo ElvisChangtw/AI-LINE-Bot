@@ -8,7 +8,6 @@ import com.linecorp.bot.webhook.model.CallbackRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -28,11 +27,6 @@ public class LineBotController {
     public LineBotController(LineSignatureVerifier signatureVerifier, WebhookIngestService ingestService) {
         this.signatureVerifier = signatureVerifier;
         this.ingestService = ingestService;
-    }
-
-    @GetMapping("/hello")
-    public void hello() {
-        System.out.println("Hello World");
     }
 
     @PostMapping("/callback")

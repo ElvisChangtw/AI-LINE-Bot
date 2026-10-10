@@ -27,23 +27,26 @@ public class RecentMaterialPicker {
         this.props = props;
     }
 
-    public Optional<Material> pick(String groupId, String triggerMessageId, long triggerAt) {
+    public record Picked(Material material, String senderId) {
+    }
+
+    public Optional<Picked> pick(String groupId, String triggerMessageId, long triggerAt) {
         long since = triggerAt - props.recentWindow().toMillis();
         return latestRun(materials.recentCandidates(groupId, since, triggerAt, triggerMessageId));
     }
 
-    static Optional<Material> latestRun(List<RecentMessage> newestFirst) {
+    static Optional<Picked> latestRun(List<RecentMessage> newestFirst) {
         if (newestFirst.isEmpty()) {
             return Optional.empty();
         }
         RecentMessage latest = newestFirst.getFirst();
         if (latest.material().kind() != MaterialKind.TEXT) {
-            return Optional.of(latest.material());
+            return Optional.of(new Picked(latest.material(), latest.senderId()));
         }
         List<Material> run = new ArrayList<>(List.of(latest.material()));
         for (RecentMessage older : newestFirst.subList(1, newestFirst.size())) {
             Material previous = run.getLast();
-            boolean sameSender = latest.senderHash() != null && Objects.equals(latest.senderHash(), older.senderHash());
+            boolean sameSender = latest.senderId() != null && Objects.equals(latest.senderId(), older.senderId());
             boolean close = previous.createdAt() - older.material().createdAt() <= SAME_SENDER_GAP.toMillis();
             if (!sameSender || !close || older.material().kind() != MaterialKind.TEXT) {
                 break;
@@ -52,7 +55,8 @@ public class RecentMaterialPicker {
         }
         List<String> texts = run.reversed().stream().map(Material::text).toList();
         Material newest = latest.material();
-        return Optional.of(new Material(newest.groupId(), newest.messageId(), MaterialKind.TEXT, String.join("\n", texts),
-                false, newest.mediaStatus(), null, 0, run.getLast().createdAt(), newest.expiresAt()));
+        Material merged = new Material(newest.groupId(), newest.messageId(), MaterialKind.TEXT, String.join("\n", texts),
+                false, newest.mediaStatus(), null, 0, run.getLast().createdAt(), newest.expiresAt());
+        return Optional.of(new Picked(merged, latest.senderId()));
     }
 }

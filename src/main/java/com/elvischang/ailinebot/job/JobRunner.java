@@ -8,6 +8,7 @@ import com.elvischang.ailinebot.factcheck.FactCheckService;
 import com.elvischang.ailinebot.factcheck.InvalidModelOutputException;
 import com.elvischang.ailinebot.factcheck.ReplyMode;
 import com.elvischang.ailinebot.line.Hashes;
+import com.elvischang.ailinebot.line.SenderNames;
 import com.elvischang.ailinebot.material.RecentMaterialPicker;
 import com.elvischang.ailinebot.service.ImageGenerationService;
 import com.elvischang.ailinebot.store.Job;
@@ -30,18 +31,20 @@ public class JobRunner {
     private final JobRepository jobs;
     private final MaterialRepository materials;
     private final RecentMaterialPicker picker;
+    private final SenderNames senderNames;
     private final FactCheckService factCheckService;
     private final ImageGenerationService imageGenerationService;
     private final ReplySender replySender;
     private final BotProperties props;
     private final Clock clock;
 
-    public JobRunner(JobRepository jobs, MaterialRepository materials, RecentMaterialPicker picker, FactCheckService factCheckService,
+    public JobRunner(JobRepository jobs, MaterialRepository materials, RecentMaterialPicker picker, SenderNames senderNames, FactCheckService factCheckService,
                      ImageGenerationService imageGenerationService, ReplySender replySender,
                      BotProperties props, Clock clock) {
         this.jobs = jobs;
         this.materials = materials;
         this.picker = picker;
+        this.senderNames = senderNames;
         this.factCheckService = factCheckService;
         this.imageGenerationService = imageGenerationService;
         this.replySender = replySender;
@@ -105,14 +108,15 @@ public class JobRunner {
                 return recorded(job, firstPass);
             }
         }
-        Optional<Material> picked = picker.pick(job.groupId(), job.triggerMessageId(), job.createdAt());
+        Optional<RecentMaterialPicker.Picked> picked = picker.pick(job.groupId(), job.triggerMessageId(), job.createdAt());
         if (picked.isEmpty()) {
             return firstPass == null ? BotReplies.ASK_TO_QUOTE : recorded(job, firstPass);
         }
         return lookedBack(job, picked.get(), question);
     }
 
-    private String lookedBack(Job job, Material material, String question) {
+    private String lookedBack(Job job, RecentMaterialPicker.Picked picked, String question) {
+        Material material = picked.material();
         if (material.kind() == MaterialKind.AUDIO || material.kind() == MaterialKind.VIDEO) {
             return BotReplies.MEDIA_UNSUPPORTED;
         }
@@ -124,7 +128,8 @@ public class JobRunner {
             log.info("look-back unusable jobId={} cause={}", job.id(), e.getMessage());
             return BotReplies.ASK_TO_QUOTE;
         }
-        return BotReplies.lookedAt(material.createdAt(), material.text()) + recorded(job, reply);
+        String name = senderNames.displayName(job.groupId(), picked.senderId()).orElse(null);
+        return BotReplies.lookedAt(name, material.createdAt(), material.text()) + recorded(job, reply);
     }
 
     private String recorded(Job job, FactCheckReply reply) {

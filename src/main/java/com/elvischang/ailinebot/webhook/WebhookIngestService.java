@@ -88,7 +88,7 @@ public class WebhookIngestService {
             return;
         }
         String chatId = chat.get();
-        String sender = LineSources.senderId(event.source()).map(Hashes::shortHash).orElse(null);
+        String sender = LineSources.senderId(event.source()).orElse(null);
         String jobId = null;
         switch (event.message()) {
             case TextMessageContent text -> jobId = ingestText(chatId, text, event.replyToken(), sender, now);

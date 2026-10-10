@@ -21,6 +21,8 @@ import static com.elvischang.ailinebot.support.Webhooks.groupText;
 import static com.elvischang.ailinebot.support.Webhooks.groupTextFrom;
 import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
@@ -87,11 +89,15 @@ class JobFlowTest extends IntegrationTestSupport {
         awaitSendState("100", SendState.REPLIED);
         assertThat(factChecks.calls()).containsExactly("99");
         assertThat(factChecks.materialTexts()).containsExactly("第一則\n第二則");
+        LINE.verify(postRequestedFor(urlEqualTo(REPLY))
+                .withRequestBody(matchingJsonPath("$.messages[0].text", containing("「第一則 第二則」那則"))));
     }
 
     @Test
     void aQuestionAboutAnUnquotedMessageLooksBackAndSaysWhichOne() throws Exception {
         stubReplyOk("900");
+        LINE.stubFor(get(urlEqualTo("/v2/bot/group/Cg1/member/Uuser"))
+                .willReturn(okJson("{\"displayName\":\"媽媽\\nhttps://x.example\",\"userId\":\"Uuser\"}")));
         factChecks.askForMaterialWhenAlone();
         postWebhook(body(groupTextFrom("e0", "Cg1", "97", "別人的訊息", "Uother"),
                 groupText("e1", "Cg1", "98", "健保署公告"), groupText("e2", "Cg1", "99", "看到不要點")));
@@ -101,7 +107,8 @@ class JobFlowTest extends IntegrationTestSupport {
         assertThat(factChecks.calls()).containsExactly(RecordingFactCheckService.QUESTION_ONLY, "99");
         assertThat(factChecks.materialTexts()).containsExactly("健保署公告\n看到不要點");
         LINE.verify(postRequestedFor(urlEqualTo(REPLY))
-                .withRequestBody(matchingJsonPath("$.messages[0].text", containing("「健保署公告 看到不要點」那則")))
+                .withRequestBody(matchingJsonPath("$.messages[0].text", containing("（我看的是 媽媽 ")))
+                .withRequestBody(matchingJsonPath("$.messages[0].text", containing("傳的「健保署公告 看到不要點」")))
                 .withRequestBody(matchingJsonPath("$.messages[0].text", containing("TEST RESULT 99"))));
     }
 

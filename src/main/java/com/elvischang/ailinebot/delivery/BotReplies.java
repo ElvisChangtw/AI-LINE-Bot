@@ -39,12 +39,13 @@ public final class BotReplies {
     private BotReplies() {
     }
 
-    public static String lookedAt(long sentAt, String text) {
+    public static String lookedAt(String senderName, long sentAt, String text) {
         String snippet = text == null ? "圖片" : text.replaceAll("\\s+", " ").strip();
         if (snippet.length() > LOOKED_AT_SNIPPET) {
             snippet = snippet.substring(0, LOOKED_AT_SNIPPET) + "…";
         }
-        return "（我看的是 " + CLOCK.format(Instant.ofEpochMilli(sentAt)) + "「" + snippet
-                + "」那則，猜錯了請「引用」再 @ 我）\n";
+        String when = CLOCK.format(Instant.ofEpochMilli(sentAt));
+        String which = senderName == null ? when + "「" + snippet + "」那則" : senderName + " " + when + " 傳的「" + snippet + "」";
+        return "（我看的是 " + which + "，猜錯了請「引用」再 @ 我）\n";
     }
 }
