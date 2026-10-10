@@ -37,20 +37,23 @@ class EvalRunTest {
                 spend, Clock.systemUTC());
         JsonNode samples = new ObjectMapper().readTree(new ClassPathResource("eval/samples.json").getInputStream());
         StringBuilder table = new StringBuilder("| id | category | expected | actual | match | searches | costMicroUsd |\n|---|---|---|---|---|---|---|\n");
+        int checked = 0;
         StringBuilder replies = new StringBuilder();
         int matches = 0;
         int errors = 0;
         for (JsonNode sample : samples) {
             String id = sample.get("id").asText();
-            String expected = sample.get("expected").asText();
+            String expected = expected(sample);
             String actual;
             int searches = 0;
             String reply;
             long billedBefore = billed.get();
             try {
-                ModelCheck check = checker.check(new FactCheckInput(sample.get("text").asText(), null, null, QUESTION, LocalDate.now()));
+                String text = sample.hasNonNull("text") ? sample.get("text").asText() : null;
+                String question = sample.hasNonNull("question") ? sample.get("question").asText() : QUESTION;
+                ModelCheck check = checker.check(new FactCheckInput(text, null, null, question, LocalDate.now()));
                 FactCheckResult filtered = CitationFilter.apply(check.result(), check.consultedUrls());
-                actual = filtered.overall().name();
+                actual = actual(sample, filtered);
                 searches = check.usage().searchCalls();
                 reply = ReplyFormatter.format(filtered, false);
             } catch (RuntimeException e) {
@@ -60,15 +63,46 @@ class EvalRunTest {
             }
             boolean match = actual.equals(expected);
             long cost = billed.get() - billedBefore;
-            matches += match ? 1 : 0;
+            checked += expected.isEmpty() ? 0 : 1;
+            matches += match && !expected.isEmpty() ? 1 : 0;
             table.append(String.format("| %s | %s | %s | %s | %s | %d | %d |%n", id, sample.get("category").asText(),
                     expected, actual, match ? "✓" : "✗", searches, cost));
             replies.append("### ").append(id).append("\n\n```\n").append(reply).append("\n```\n\n");
         }
-        table.append(String.format("%nmodel=%s matches=%d/%d errors=%d totalCostMicroUsd=%d%n%n", props.model(), matches, samples.size(), errors, billed.get()));
+        table.append(String.format("%nmodel=%s matches=%d/%d errors=%d totalCostMicroUsd=%d%n%n", props.model(), matches, checked, errors, billed.get()));
         Path out = Path.of("target", "eval-" + props.model() + ".md");
         Files.createDirectories(out.getParent());
         Files.writeString(out, table.append(replies).toString(), StandardCharsets.UTF_8);
         System.out.println("eval report: " + out.toAbsolutePath());
+    }
+
+    // Each sample states only what it checks: a verdict, a reply mode, a high-risk flag, or a mix.
+    private static String expected(JsonNode sample) {
+        StringBuilder expected = new StringBuilder();
+        if (sample.hasNonNull("expected")) {
+            expected.append(sample.get("expected").asText());
+        }
+        if (sample.hasNonNull("expected_mode")) {
+            expected.append(" mode=").append(sample.get("expected_mode").asText());
+        }
+        if (sample.hasNonNull("expected_high_risk")) {
+            expected.append(" highRisk=").append(sample.get("expected_high_risk").asBoolean());
+        }
+        return expected.toString().trim();
+    }
+
+    private static String actual(JsonNode sample, FactCheckResult result) {
+        StringBuilder actual = new StringBuilder();
+        if (sample.hasNonNull("expected")) {
+            actual.append(result.overall().name());
+        }
+        if (sample.hasNonNull("expected_mode")) {
+            actual.append(" mode=").append(result.mode().name());
+        }
+        if (sample.hasNonNull("expected_high_risk")) {
+            actual.append(" highRisk=").append(result.highRisk());
+        }
+        String checked = actual.toString().trim();
+        return checked.isEmpty() ? "mode=" + result.mode().name() + " highRisk=" + result.highRisk() : checked;
     }
 }
