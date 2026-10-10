@@ -1,116 +1,57 @@
-# AI-LINE-Bot
+# AI-LINE-Bot：家族群組小幫手
 
-> A general‑purpose LINE chatbot built with **Spring Boot 3**, **Spring AI**, and **OpenAI**. It supports natural‑language chat, Whisper voice transcription, `/imagine` image generation, and ships in a slim multi‑stage **Docker** image—ready for Render, Fly.io, Railway, or any Docker‑capable host.
+家族 LINE 群組裡的查證兼問答 bot。家人引用一則轉傳訊息再 @ 它，它會上網查證，用長輩看得懂的話回「這則是真是假、為什麼、不用怕」；直接 @ 它問問題（天氣、健康常識、補助怎麼申請、手機怎麼用），它會查資料後簡短回答。
 
----
+設計細節在 `docs/superpowers/specs/2026-10-09-family-fact-check-bot-design.md`。
 
-## ✨ Features
+## 在群組裡怎麼用
 
-| Capability          | Details                                                                                  |
-| ------------------- | ---------------------------------------------------------------------------------------- |
-| 💬 Chat & Q\&A      | Sends user messages to OpenAI and streams concise answers.                               |
-| 🎙️ Voice messages  | Converts LINE audio messages to text with **Whisper** and routes them through chat.      |
-| 🎨 Image generation | `/imagine <prompt>` → DALL·E 3 (standard) or GPT‑Image‑1 (when prompt contains **高畫質**). |
-| 🐳 Container ready  | Multi‑stage Dockerfile (Java 21) → < 200 MB runtime image.                               |
-| 🚀 One‑click deploy | Works out‑of‑the‑box on any platform that builds a Dockerfile.                           |
+| 動作 | bot 的反應 |
+|---|---|
+| 引用一則訊息（文字或圖片）＋ @ bot | 查證那則；有寫問題就針對問題回答 |
+| 直接 @ bot 問問題 | 上網查資料後回答；健康、錢、法規、補助、即時資訊查不到可靠來源就不亂答 |
+| 只打 @ bot | 查最近 10 分鐘內唯一的一則；有好幾則會請你引用 |
+| `/imagine 內容` | 畫圖 |
+| 沒 @ bot 的訊息 | 不讀內容、不回覆；文字和圖片暫存 7 天方便之後引用 |
 
----
+bot 只用 reply 回覆（不用 push，LINE 不收費），來不及的答案會搭下一則訊息送出。
 
-## 🏗️ Tech Stack
+## 架構
 
-* **Java 21**, **Spring Boot 3.3**
-* **Spring AI 1.0.0‑M8** (Chat, Image, Audio)
-* **LINE Bot SDK 9.7**
-* **Maven 3.9.6**
-* **Docker** & **Compose V2**
+```
+LINE ─► Cloudflare ─► cloudflared ─► app :8080 ─► OpenAI Responses API（web_search）
+                      (Tunnel)        Spring Boot＋SQLite（/data）
+```
 
----
+- Java 21、Spring Boot 3.3、SQLite＋Flyway、`openai-java`（查證與問答）、Spring AI（`/imagine`）。
+- 一次模型呼叫同時決定「查證／回答／請你引用」，來源網址只留模型真的搜尋過的（`CitationFilter`）。
+- 用量上限：每日 US$2、每月 US$40（`application.yaml` 的 `factcheck.*-limit-micro-usd`）。
 
-## 🚀 Quick Start (Docker‑only)
-
-### 1. Clone & create `.env`
+## 本機開發
 
 ```bash
-git clone https://github.com/<your-name>/AI-LINE-Bot.git
-cd AI-LINE-Bot
-cp .env.example .env   # or create manually
+mvn test                      # 不連外網、不用真 key（OpenAI 與 LINE 都是 WireMock）
+cp .env.example .env          # 填 LINE 與 OpenAI 的 key
+set -a; source .env; set +a
+BOT_DB_PATH=./target/app.db BOT_MEDIA_DIR=./target/media mvn spring-boot:run
 ```
 
-#### `.env` format
-
-```env
-# ▶ LINE credentials
-LINE_CHANNEL_TOKEN=YOUR_LINE_CHANNEL_TOKEN
-LINE_CHANNEL_SECRET=YOUR_LINE_CHANNEL_SECRET
-
-# ▶ OpenAI credentials & tuning
-OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-OPEN_AI_MODEL=gpt-4o           # e.g. gpt-4o, gpt-3.5-turbo, etc.
-OPEN_AI_TEMPERATURE=0.7        # 0 – 2
-
-# ▶ Optional Spring profile / port overrides
-SPRING_PROFILES_ACTIVE=prod
-PORT=8080                      # matches Dockerfile EXPOSE
-```
-
-> **Keep `.env` private!** It is ignored by Git via `.gitignore`.
-
-### 2. Build the image
+會花錢的真模型測試預設不跑：
 
 ```bash
-docker build -t ai-line-bot .
+mvn test -Dgroups=live -Dtest.excludedGroups=none -Dtest=EvalRunTest    # 公開謠言＋問答樣本，報表在 target/eval-*.md
 ```
 
-### 3. Run the container
+## 部署
 
-```bash
-docker run -d --name ai-line-bot \
-  --env-file .env \
-  -p 8080:8080 \
-  ai-line-bot
-```
+Lightsail（docker compose：app＋cloudflared）＋ GitHub Actions → ECR → SSM。push 到 `main` 且 repo variable `DEPLOY_ENABLED=true` 時自動部署；新版 90 秒內沒有 healthy 就自動切回上一版。
 
-### 4. (Optional) Use Docker Compose for local dev
+- 第一次架設：照 `docs/deploy-runbook.md` 做。
+- rollback：GitHub → Actions → deploy → Run workflow，填舊的 commit sha；或在主機上跑 `sudo /opt/linebot/deploy.sh <舊 sha>`。
+- 備份：主機每晚 04:15 備份 SQLite 到 `/var/backups/linebot/`，保留 7 份；另外開 Lightsail 每日 snapshot。
 
-`docker-compose.yml` (Compose V2 syntax):
-
-```yaml
-services:
-  line-bot:
-    build: .
-    ports:
-      - "8080:8080"
-    env_file:
-      - .env
-```
-
-```bash
-docker compose up --build
-```
-
----
-
-## ☁️ Deploying to Render
-
-1. **Create → Web Service** → choose **Docker** environment.
-2. Connect the repository; Render auto‑detects `Dockerfile`.
-3. Add the variables from `.env` in **Environment** settings.
-4. Set **Port** to `8080`.
-5. Create the service—Render handles the rest.
-
-Render ignores `docker-compose.yml`; only the `Dockerfile` is required.
-
----
-
-## 🔌 API Endpoints
-
-| Method | Path        | Purpose                                                                             |
-| ------ | ----------- | ----------------------------------------------------------------------------------- |
-| `GET`  | `/hello`    | Health check                                                                        |
-| `POST` | `/callback` | LINE webhook – **must** match the URL set in the LINE console (append `/callback`). |
-
----
-
-## 🛠️ Customising Bot Behaviour
-Adjust the `openai.system-prompt` in `application.yml` to give the bot a different persona or rules, and tweak temperature/model through `.env`.
----
+| 位置 | 內容 |
+|---|---|
+| `/opt/linebot/app.env` | `LINE_CHANNEL_SECRET`、`LINE_CHANNEL_TOKEN`、`OPENAI_API_KEY`（600） |
+| `/opt/linebot/tunnel.env` | `TUNNEL_TOKEN`（600） |
+| `/opt/linebot/deploy.env` | `ECR_REPO`、`AWS_REGION` |

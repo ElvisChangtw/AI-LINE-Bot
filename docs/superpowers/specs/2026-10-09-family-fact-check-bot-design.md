@@ -94,7 +94,7 @@
 ## 5. 架構與資料流
 
 ```
-LINE ─► Caddy :443 ─► app :8080（compose 內網，不 publish）
+LINE ─► Cloudflare ─► cloudflared（Tunnel，主機往外連）─► app :8080（compose 內網，不 publish）
 
 POST /callback
  1. 用原始 body 驗 X-Line-Signature（HMAC-SHA256）。失敗回 400，不寫任何東西
@@ -471,7 +471,9 @@ https://tfc-taiwan.org.tw/?p=108215
 ## 11. 安全
 
 - 驗簽用原始 body，在 parse JSON 之前做。HTTPS 不能取代驗簽。
-- Caddy 只轉送 `POST /callback`，其他路徑一律 404。actuator 只在 compose 內網。
+- 對外入口是 Cloudflare Tunnel（2026-10-10 取代 Caddy）：public hostname 只轉 `^/callback$`，其他路徑在 Cloudflare 就 404。actuator 只在 compose 內網。主機不開 80／443。
+- `/callback` 沒有 Content-Length 回 411、超過 1 MB 回 413，在讀 body、驗簽之前擋（`CallbackBodyLimitFilter`）。
+- 啟動時 LINE secret／token、OpenAI key 是空字串就直接失敗。
 - 主機不抓素材裡的網址（無 SSRF 入口）。圖片下載只打 LINE 的 blob API。
 - 不執行任何外部指令。第一階段不呼叫 ffmpeg（語音不轉錄）。
 - secret 只從環境變數注入，不進 git、不進 image、不印 log。啟動時檢查必要 secret 都在，缺了就直接啟動失敗。
@@ -490,35 +492,22 @@ https://tfc-taiwan.org.tw/?p=108215
 
 ## 13. 部署
 
-### 13.1 Compose
+### 13.1 Compose（2026-10-10 改用 Cloudflare Tunnel）
 
-```yaml
-services:
-  caddy:
-    image: caddy:2.8
-    ports: ["80:80", "443:443"]
-    volumes: [./Caddyfile:/etc/caddy/Caddyfile:ro, caddy-data:/data]
-  app:
-    image: ${ECR_REPO}:${APP_TAG}
-    env_file: /opt/linebot/.env
-    expose: ["8080"]
-    mem_limit: 1g
-    environment:
-      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=60"
-    volumes: [app-data:/data]
-    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
-volumes: { caddy-data: {}, app-data: {} }
-```
+檔案：`infra/host/docker-compose.yml`，每次部署由 workflow 隨 commit 一起送到主機。
 
-主機：Lightsail 2 GB 方案，2 vCPU、60 GB SSD，有 public IPv4 是 US$12/月（IPv6-only 是 US$10。但 LINE webhook 能不能打到 IPv6-only 主機、主機連 ECR 和 OpenAI 時 IPv6-only 會不會出問題，都還沒確認，所以先選有 IPv4 的，多 US$2 換掉這個風險）。內建 metric 只有 CPU、burst、網路、status check，沒有記憶體和硬碟，所以要裝 CloudWatch agent。
+- `app`：ECR image（tag = git sha）、`env_file: /opt/linebot/app.env`、只 `expose: 8080`、`mem_limit: 1g`、`stop_grace_period: 45s`（比 app 的 30 秒 graceful shutdown 長）、`-XX:MaxRAMPercentage=60`、volume `app-data:/data`、healthcheck 打 `/actuator/health`、log 輪替。image 以 uid 10001 執行。
+- `cloudflared`：`cloudflare/cloudflared:2026.9.3`、`env_file: /opt/linebot/tunnel.env`（`TUNNEL_TOKEN`）、等 app healthy 才啟動。tunnel 由 Cloudflare dashboard 管理：public hostname `bot.<網域>` → `http://app:8080`，path `^/callback$`。網域由使用者在 Cloudflare 購買（`dagoo.tw` 不是使用者的網域，不能用）。
+- 不 publish 任何 port。
 
-記憶體估算（2 GB）：OS 約 300 MB、Caddy 約 30 MB、app 上限 1 GB（實際約 500 MB）、SSM agent＋CloudWatch agent 約 100 MB。第一階段很寬鬆，第二階段的影片處理要實測。
+主機：Lightsail 2 GB 方案，2 vCPU、60 GB SSD，有 public IPv4 是 US$12/月。改用 Tunnel 後 inbound 不需要 IPv4，但主機要主動連 LINE API、ECR、Docker Hub，IPv6-only 能不能通都還沒確認，所以仍選有 IPv4 的方案。內建 metric 只有 CPU、burst、網路、status check，沒有記憶體和硬碟，所以要裝 CloudWatch agent。
+
+記憶體估算（2 GB）：OS 約 300 MB、cloudflared 約 30 MB、app 上限 1 GB（實際約 500 MB）、SSM agent＋CloudWatch agent 約 100 MB。
 
 ### 13.2 Lightsail firewall（IPv4、IPv6 各設一次）
 
-- 443：公開。80：公開（申請憑證＋轉址）。
+- 80、443：關閉（Tunnel 是主機往外連，不需要 inbound）。
 - 22：勾「Restrict to IP address」再勾「Allow Lightsail browser SSH/RDP」，不另外放行任何 IP。部署走 SSM，不用 22。
-- 8080 與 SQLite 不對外。
 
 ### 13.3 CI/CD
 
@@ -527,7 +516,7 @@ volumes: { caddy-data: {}, app-data: {} }
 .github/workflows/deploy.yml   main：verify → build → push ECR（tag = git sha）
                                → aws ssm send-command → 自己輪詢 get-command-invocation
                                只在 repo variable DEPLOY_ENABLED == 'true' 時執行
-infra/host/deploy.sh <sha>     記下目前 tag → pull → up -d → 60 秒內打 health
+infra/host/deploy.sh <sha>     記下目前 tag → pull → up -d → 90 秒內 healthy
                                → 失敗就切回上一個 tag 再 up -d，exit 1
 ```
 
@@ -550,7 +539,7 @@ infra/host/deploy.sh <sha>     記下目前 tag → pull → up -d → 60 秒內
 
 ### 13.5 備份與 rollback
 
-- 每晚 cron：`sqlite3 /data/app.db ".backup /data/backup/app-$(date +%F).db"`，保留 7 份。搭配 Lightsail 每日自動 snapshot（保留最新 7 份，US$0.05/GB-月；刪掉 instance 時自動 snapshot 會一起被刪）。
+- 每晚 cron（`infra/host/backup.sh`，04:15）：從 docker volume 的 `app.db` 做 `sqlite3 .backup` 到 `/var/backups/linebot/app-YYYY-MM-DD.db`（600），保留 7 份。搭配 Lightsail 每日自動 snapshot（保留最新 7 份，US$0.05/GB-月；刪掉 instance 時自動 snapshot 會一起被刪）。
 - rollback：在 GitHub 手動執行 deploy workflow，指定舊的 sha；或在主機執行 `deploy.sh <舊 sha>`。
 
 ## 14. 對既有程式的處理
@@ -601,7 +590,7 @@ infra/host/deploy.sh <sha>     記下目前 tag → pull → up -d → 60 秒內
 
 1. 地基：驗簽、Flyway＋SQLite、ingest／去重／素材、gate、job＋AFTER_COMMIT 派發、恢復掃描、`ReplySender`。用假的 `FactChecker` 跑通整條路。
 2. 查證：先做 §8.2 的 spike（structured output＋`web_search` 能否並用），再做 `OpenAiResponsesFactChecker`、`CitationFilter`、`ReplyFormatter`、快取、`UsageGuard`、圖片 vision、`ImagineJobHandler`、eval 腳本。
-3. 部署：Dockerfile、compose、Caddyfile、`infra/` 腳本、兩個 workflow、部署／rollback／資料保存文件。
+3. 部署：Dockerfile、compose（含 cloudflared）、`infra/` 腳本、兩個 workflow、部署／rollback／資料保存文件。
 
 每一步都先寫會失敗的測試。
 
