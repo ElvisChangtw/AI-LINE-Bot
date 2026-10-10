@@ -82,8 +82,14 @@ public class DefaultFactCheckService implements FactCheckService {
             log.info("factcheck refused groupHash={} reason=budget", Hashes.shortHash(groupId));
             return FactCheckReply.notice(BotReplies.QUOTA_EXCEEDED);
         }
-        ModelCheck check = checker.check(new FactCheckInput(text, image, image == null ? null : mimeType(image),
-                userQuestion, LocalDate.now(clock.withZone(TAIPEI))));
+        ModelCheck check;
+        try {
+            check = checker.check(new FactCheckInput(text, image, image == null ? null : mimeType(image),
+                    userQuestion, LocalDate.now(clock.withZone(TAIPEI))));
+        } catch (OutOfCreditException e) {
+            log.warn("factcheck refused groupHash={} reason=out_of_credit", Hashes.shortHash(groupId));
+            return FactCheckReply.notice(BotReplies.OUT_OF_CREDIT);
+        }
         if (check.result().mode() == ReplyMode.NEED_MATERIAL && (text != null || image != null)) {
             throw new InvalidModelOutputException("asked for material that was already sent");
         }

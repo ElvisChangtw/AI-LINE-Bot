@@ -41,6 +41,7 @@ public class OpenAiResponsesFactChecker implements FactChecker {
     private static final long ESTIMATED_FAILURE_INPUT_TOKENS = 20_000;
     private static final long ESTIMATED_FAILURE_OUTPUT_TOKENS = 4_000;
     private static final int FIRST_SERVER_ERROR_STATUS = 500;
+    private static final String INSUFFICIENT_QUOTA = "insufficient_quota";
     private static final String IMAGE_PLACEHOLDER = "（素材是一張圖片）";
 
     private final OpenAIClient client;
@@ -114,6 +115,9 @@ public class OpenAiResponsesFactChecker implements FactChecker {
             spending.record(clock.millis(), estimatedFailureCostMicroUsd());
             throw e;
         } catch (OpenAIServiceException e) {
+            if (e.code().filter(INSUFFICIENT_QUOTA::equals).isPresent()) {
+                throw new OutOfCreditException(e);
+            }
             if (e.statusCode() >= FIRST_SERVER_ERROR_STATUS) {
                 spending.record(clock.millis(), estimatedFailureCostMicroUsd());
             }

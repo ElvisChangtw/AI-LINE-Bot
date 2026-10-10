@@ -70,6 +70,6 @@ factcheck:
   output-micro-usd-per-million: 500000
   search-micro-usd-per-call: 10000
   daily-limit-micro-usd: 2000000
-  monthly-limit-micro-usd: 40000000
+  monthly-limit-micro-usd: 10000000
   cache-ttl: 24h
   prompt-version: v2

@@ -25,7 +25,7 @@ LINE ─► Cloudflare ─► cloudflared ─► app :8080 ─► OpenAI Respons
 
 - Java 21、Spring Boot 3.3、SQLite＋Flyway、`openai-java`（查證與問答）、Spring AI（`/imagine`）。
 - 一次模型呼叫同時決定「查證／回答／請你引用」，來源網址只留模型真的搜尋過的（`CitationFilter`）。
-- 用量上限：每日 US$2、每月 US$40（`application.yaml` 的 `factcheck.*-limit-micro-usd`）。
+- 用量上限：每日 US$2、每月 US$10（`application.yaml` 的 `factcheck.*-limit-micro-usd`）。
 
 ## 本機開發
 

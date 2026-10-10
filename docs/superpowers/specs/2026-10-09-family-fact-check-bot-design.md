@@ -429,7 +429,7 @@ https://tfc-taiwan.org.tw/?p=108215
 ### 10.1 用量上限
 
 - 每次呼叫記錄 input／output token 和搜尋次數，用 config 裡的單價換算成 `cost_micro_usd`。
-- 呼叫模型前檢查當日與當月累計成本。`daily-limit-usd`、`monthly-limit-usd` 是 config，預設 US$2／天、US$40／月。
+- 呼叫模型前檢查當日與當月累計成本。`daily-limit-usd`、`monthly-limit-usd` 是 config，預設 US$2／天、US$10／月（2026-10-10 從 US$40 降到跟 OpenAI 預付餘額一致）。OpenAI 回 `insufficient_quota` 時改回 `BotReplies.OUT_OF_CREDIT`，不重試。
 - 超過上限就回額度用完的固定文字（用 reply，不花 LINE 額度；2026-10-10 文字見 §9），不 fallback 到其他 provider。
 - 快取命中不算用量。
 - 2026-10-10：查證和一般問答共用同一組上限。`NEED_MATERIAL` 也算一次呼叫（通常不搜尋，很便宜）。

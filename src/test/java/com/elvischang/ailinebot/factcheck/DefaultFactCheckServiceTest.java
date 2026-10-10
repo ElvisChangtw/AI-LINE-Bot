@@ -178,6 +178,15 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
     }
 
     @Test
+    void tellsTheGroupWhenTheCreditBalanceIsEmpty() {
+        when(checker.check(any())).thenThrow(new OutOfCreditException(new RuntimeException("429")));
+
+        FactCheckReply reply = ask(text("Cg1", "1", "內容"), "真的嗎");
+
+        assertThat(reply.text()).isEqualTo(BotReplies.OUT_OF_CREDIT);
+    }
+
+    @Test
     void sendsStoredImagesAndWaitsForPendingOnes() throws Exception {
         when(checker.check(any())).thenReturn(new ModelCheck(RESULT, Set.of("https://tfc-taiwan.org.tw/?p=108215"), Usage.NONE));
         long now = clock.millis();

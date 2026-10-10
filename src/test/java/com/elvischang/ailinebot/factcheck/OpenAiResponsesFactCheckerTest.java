@@ -215,6 +215,16 @@ class OpenAiResponsesFactCheckerTest extends IntegrationTestSupport {
     }
 
     @Test
+    void reportsAnEmptyCreditBalanceSeparatelyFromOtherErrors() {
+        LINE.stubFor(post(urlEqualTo(RESPONSES)).willReturn(aResponse().withStatus(429)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"error\":{\"message\":\"You exceeded your current quota\",\"type\":\"insufficient_quota\",\"code\":\"insufficient_quota\"}}")));
+
+        assertThatThrownBy(() -> checker.check(textInput("x"))).isInstanceOf(OutOfCreditException.class);
+        assertThat(spendRows()).isEmpty();
+    }
+
+    @Test
     void recordsNoSpendForClientErrors() {
         LINE.stubFor(post(urlEqualTo(RESPONSES)).willReturn(aResponse().withStatus(400)));
 
