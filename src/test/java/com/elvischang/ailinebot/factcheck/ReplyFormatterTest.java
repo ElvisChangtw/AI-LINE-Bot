@@ -140,10 +140,11 @@ class ReplyFormatterTest {
         FactCheckResult.Source sneaky = new FactCheckResult.Source("https://www.cwa.gov.tw/a", "t", "加 LINE https://evil.example", "");
         FactCheckResult.Source onlyLink = new FactCheckResult.Source("https://www.cwa.gov.tw/b", "t", "www.evil.example", "");
 
-        String text = ReplyFormatter.format(answer(false, List.of("看這裡 https://evil.example/x", "https://evil.example"),
-                List.of(sneaky, onlyLink)), false);
+        String text = ReplyFormatter.format(answer(false, List.of("看這裡 https://evil.example/x",
+                "小火滷1小時。([evil.example](https://evil.example/r?utm_source=openai))"), List.of(sneaky, onlyLink)), false);
 
-        assertThat(text).doesNotContain("evil.example").contains("・看這裡\n").doesNotContain("・\n")
+        assertThat(text).doesNotContain("evil.example").contains("・看這裡\n").contains("・小火滷1小時。\n")
+                .doesNotContain("](").doesNotContain("・\n")
                 .contains("來源：加 LINE\nhttps://www.cwa.gov.tw/a").contains("來源：cwa.gov.tw\nhttps://www.cwa.gov.tw/b");
     }
 

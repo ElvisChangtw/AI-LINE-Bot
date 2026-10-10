@@ -15,7 +15,7 @@ public final class BotReplies {
     public static final String QUOTA_EXCEEDED = "今天的額度被大家問光了，我先去充電，明天見 🔋";
     public static final String OUT_OF_CREDIT = "AskBot 沒電了，請叫 Elvis 加值 🔋";
     public static final String HIGH_RISK_NO_SOURCE =
-            "這題我查不到可靠的資料，不敢亂回答。健康、用藥請問醫師或藥師；補助、法規可以打 1999 問。";
+            "這題我查不到可靠的資料，不敢亂回答。健康、用藥請問醫師或藥師；補助、法規可以打 1999 問；天氣可以看中央氣象署 App。";
     public static final String IMAGE_NOT_READY = "這張圖還在處理，請過一分鐘再問我一次";
     public static final String DELAYED_PREFIX = "（回覆剛才的問題）\n";
     public static final String JOIN_NOTICE = """

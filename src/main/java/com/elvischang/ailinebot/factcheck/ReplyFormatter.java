@@ -18,6 +18,8 @@ public final class ReplyFormatter {
     private static final int MAX_SOURCES = 2;
     private static final String BULLET = "・";
     private static final Pattern LINK = Pattern.compile("(https?://|www\\.)\\S+", Pattern.CASE_INSENSITIVE);
+    // Models sometimes inline citations as "([site](url))"; drop the whole thing, not just the url.
+    private static final Pattern MARKDOWN_LINK = Pattern.compile("\\(?\\[[^\\]]*]\\([^)\\s]*\\)\\)?");
     private static final Map<Verdict, String> LABELS = new EnumMap<>(Map.of(
             Verdict.CORRECT, "內容正確",
             Verdict.INCORRECT, "這是假消息",
@@ -115,7 +117,7 @@ public final class ReplyFormatter {
     }
 
     private static String withoutLinks(String modelText) {
-        return modelText == null ? "" : LINK.matcher(modelText).replaceAll("").strip();
+        return modelText == null ? "" : LINK.matcher(MARKDOWN_LINK.matcher(modelText).replaceAll("")).replaceAll("").strip();
     }
 
     private static String sourceBlock(FactCheckResult.Source source) {
