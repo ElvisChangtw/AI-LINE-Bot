@@ -175,7 +175,16 @@ public class OpenAiResponsesFactChecker implements FactChecker {
     private static List<String> searchSources(ResponseFunctionWebSearch call) {
         // Failed or partial calls can come back without an action; they consulted nothing.
         var action = call._action().asKnown();
-        if (action.isEmpty() || !action.get().isSearch()) {
+        if (action.isEmpty()) {
+            return List.of();
+        }
+        if (action.get().isOpenPage()) {
+            return action.get().asOpenPage()._url().asString().stream().toList();
+        }
+        if (action.get().isFind()) {
+            return action.get().asFind()._url().asString().stream().toList();
+        }
+        if (!action.get().isSearch()) {
             return List.of();
         }
         return action.get().asSearch().sources().orElse(List.of()).stream()

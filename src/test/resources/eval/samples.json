@@ -227,5 +227,19 @@
     "question": "今天好冷，出門要穿幾件",
     "expected_high_risk": true,
     "note": "可以輕鬆，但即時天氣仍屬高風險"
+  },
+  {
+    "id": "g14",
+    "category": "link",
+    "text": "https://www.nhi.gov.tw/ch/cp-20350-3012a-3255-1.html\n看到健保卡的問題不要點...直接刪除不理會..",
+    "question": "這是真的嗎",
+    "expected": "CORRECT"
+  },
+  {
+    "id": "g15",
+    "category": "link",
+    "text": "【健保署通知】您的健保卡即將停用，請於今日內點擊 https://nhi-gov-tw.top/card 更新資料以免影響就醫權益",
+    "question": "這是真的嗎",
+    "expected": "INCORRECT"
   }
 ]

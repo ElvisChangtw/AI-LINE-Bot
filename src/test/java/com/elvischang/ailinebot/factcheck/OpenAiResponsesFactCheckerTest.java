@@ -109,6 +109,22 @@ class OpenAiResponsesFactCheckerTest extends IntegrationTestSupport {
     }
 
     @Test
+    void pagesTheModelOpenedCountAsConsulted() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode root = (ObjectNode) mapper.readTree(fixture("response-vaccine.json"));
+        ((com.fasterxml.jackson.databind.node.ArrayNode) root.get("output")).insert(1, mapper.readTree("""
+                {"id":"ws_open","type":"web_search_call","status":"completed",
+                 "action":{"type":"open_page","url":"https://www.nhi.gov.tw/ch/cp-1.html"}}"""));
+        ((com.fasterxml.jackson.databind.node.ArrayNode) root.get("output")).insert(1, mapper.readTree("""
+                {"id":"ws_find","type":"web_search_call","status":"completed",
+                 "action":{"type":"find_in_page","pattern":"健保卡","url":"https://www.nhi.gov.tw/ch/cp-2.html"}}"""));
+        LINE.stubFor(post(urlEqualTo(RESPONSES)).willReturn(okJson(mapper.writeValueAsString(root))));
+
+        assertThat(checker.check(textInput("x")).consultedUrls())
+                .contains("https://www.nhi.gov.tw/ch/cp-1.html", "https://www.nhi.gov.tw/ch/cp-2.html");
+    }
+
+    @Test
     void sendsImagesAsDataUrls() throws Exception {
         LINE.stubFor(post(urlEqualTo(RESPONSES)).willReturn(okJson(fixture("response-vaccine.json"))));
 

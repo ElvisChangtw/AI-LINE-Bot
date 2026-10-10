@@ -18,7 +18,15 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Collection;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.MatchResult;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.regex.Pattern;
 
 @Service
@@ -26,7 +34,8 @@ public class DefaultFactCheckService implements FactCheckService {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultFactCheckService.class);
     private static final ZoneId TAIPEI = ZoneId.of("Asia/Taipei");
-    private static final Pattern LINK = Pattern.compile("https?://", Pattern.CASE_INSENSITIVE);
+    private static final Pattern LINK = Pattern.compile("https?://[^\\s<>\"'）)」]+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SCHEME_AND_WWW = Pattern.compile("^(https?://)?(www\\.)?", Pattern.CASE_INSENSITIVE);
     private static final Pattern WHITESPACE = Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS);
 
     private final FactChecker checker;
@@ -68,15 +77,15 @@ public class DefaultFactCheckService implements FactCheckService {
     }
 
     private FactCheckReply check(String groupId, String text, byte[] image, String imageSha256, String userQuestion) {
-        boolean hasLink = (text != null && LINK.matcher(text).find())
-                || (userQuestion != null && LINK.matcher(userQuestion).find());
+        List<String> links = links(text, userQuestion);
         long now = clock.millis();
         String key = cacheKey(userQuestion, text, imageSha256);
 
         Optional<FactCheckResult> cached = cache.get(key, now);
         if (cached.isPresent()) {
             logOutcome(groupId, true, cached.get(), Usage.NONE, 0);
-            return reply(cached.get(), hasLink, Usage.NONE, 0);
+            boolean unopened = noneOpened(links, cached.get().sources().stream().map(FactCheckResult.Source::url).toList());
+            return reply(cached.get(), unopened, Usage.NONE, 0);
         }
         if (!usageGuard.allows(now)) {
             log.info("factcheck refused groupHash={} reason=budget", Hashes.shortHash(groupId));
@@ -100,7 +109,26 @@ public class DefaultFactCheckService implements FactCheckService {
         }
         long cost = check.usage().costMicroUsd(props);
         logOutcome(groupId, false, filtered, check.usage(), cost);
-        return reply(filtered, hasLink, check.usage(), cost);
+        return reply(filtered, noneOpened(links, check.consultedUrls()), check.usage(), cost);
+    }
+
+    private static List<String> links(String text, String userQuestion) {
+        return Stream.of(text, userQuestion).filter(Objects::nonNull)
+                .flatMap(s -> LINK.matcher(s).results().map(MatchResult::group))
+                .toList();
+    }
+
+    // Opened means the model fetched the same page, ignoring scheme, www, query and trailing slash.
+    private static boolean noneOpened(List<String> links, Collection<String> openedUrls) {
+        Set<String> opened = openedUrls.stream().map(DefaultFactCheckService::page).collect(Collectors.toSet());
+        return !links.isEmpty() && links.stream().map(DefaultFactCheckService::page).noneMatch(opened::contains);
+    }
+
+    private static String page(String url) {
+        String rest = SCHEME_AND_WWW.matcher(url.strip()).replaceFirst("");
+        int cut = rest.indexOf('?') >= 0 ? rest.indexOf('?') : rest.indexOf('#');
+        rest = cut >= 0 ? rest.substring(0, cut) : rest;
+        return (rest.endsWith("/") ? rest.substring(0, rest.length() - 1) : rest).toLowerCase(Locale.ROOT);
     }
 
     private static FactCheckReply reply(FactCheckResult result, boolean hasLink, Usage usage, long cost) {

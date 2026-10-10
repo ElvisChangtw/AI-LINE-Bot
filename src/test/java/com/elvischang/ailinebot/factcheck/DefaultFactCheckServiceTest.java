@@ -250,10 +250,13 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
     }
 
     @Test
-    void aLinkInTheQuestionAlsoGetsTheNotOpenedNote() {
+    void theNotOpenedNoteOnlyAppearsWhenNoLinkWasOpened() {
         when(checker.check(any())).thenReturn(answer(ReplyMode.ANSWER));
 
         assertThat(service.verify("Cg1", null, "這個 https://x.example 能點嗎").text()).contains(BotReplies.LINK_NOT_OPENED);
+        assertThat(service.verify("Cg1", null, "這個 https://cwa.gov.tw/a/ 能信嗎").text()).doesNotContain(BotReplies.LINK_NOT_OPENED);
+        assertThat(ask(text("Cg1", "7", "健保署公告 http://www.cwa.gov.tw/a?utm_source=line"), "").text())
+                .doesNotContain(BotReplies.LINK_NOT_OPENED);
     }
 
     @Test
