@@ -15,7 +15,7 @@
    - Subdomain `bot`、Domain 選剛買的網域
    - Path：`^/callback$`
    - Service：`HTTP`、URL：`app:8080`
-4. Security → Bots：如果開了 Bot Fight Mode，LINE 的 POST 可能被擋成 challenge。到 Security → WAF 加一條 custom rule：`URI Path equals /callback` → Skip（勾 Bot Fight Mode 與所有 managed rules）。
+4. Security → Bots：**關掉 Bot Fight Mode**。免費方案的 Bot Fight Mode 不能用 WAF 規則跳過，開著的話 LINE 的 POST 可能被擋成 challenge。如果有開 managed rules，再到 Security → WAF 加一條 custom rule：`URI Path equals /callback` → Skip managed rules。
 
 ## 2. AWS 資源
 

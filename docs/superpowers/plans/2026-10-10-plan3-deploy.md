@@ -29,7 +29,7 @@
 
 1. 在 Cloudflare 買網域；Zero Trust → Tunnels 建 tunnel，拿 token；public hostname `bot.<網域>` → `http://app:8080`，path `^/callback$`。
 2. 設好個人 AWS profile（不是公司的 default），授權後跑 `AWS_PROFILE=<個人> infra/aws/setup.sh`。
-3. 建 Lightsail instance，用 browser SSH 跑 `bootstrap.sh`，填 `/opt/linebot/.env`。
+3. 建 Lightsail instance，用 browser SSH 跑 `bootstrap.sh`，填 `/opt/linebot/app.env` 和 `/opt/linebot/tunnel.env`（`/opt/linebot/.env` 由 `deploy.sh` 產生，不放 secret）。
 4. GitHub repo 設 variables（`AWS_ROLE_ARN`、`ECR_REPOSITORY`、`SSM_INSTANCE_ID`、`AWS_REGION`、`DEPLOY_ENABLED`）。
 5. LINE console：webhook URL 改成 `https://bot.<網域>/callback`、開 redelivery。
 6. OpenAI 加值 → 跑 spike 與 eval。

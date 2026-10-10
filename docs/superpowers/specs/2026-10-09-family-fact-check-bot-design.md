@@ -528,7 +528,7 @@ infra/host/deploy.sh <sha>     記下目前 tag → pull → up -d → 90 秒內
   - 不能在 root 下執行 `aws configure`，會蓋掉 `[default]`。
   - 寫入 `[default]` 這件事是從 agent 原始碼確認的，文件沒寫。bootstrap 腳本裝完後要實際驗證一次（`aws sts get-caller-identity`）。
 - SSM 計費（2026-09-30 起）：hybrid node 的 Run Command 每次 US$0.002，一個月部署 30 次約 US$0.06。
-- secret 放 `/opt/linebot/.env`（權限 600），主機準備時建立一次。
+- secret 放 `/opt/linebot/app.env`（LINE、OpenAI）和 `/opt/linebot/tunnel.env`（`TUNNEL_TOKEN`），權限 600，`bootstrap.sh` 建立一次。`/opt/linebot/.env` 是 `deploy.sh` 每次切換版本時自動產生的（只有 `ECR_REPO`、`APP_TAG`），不要把 secret 放進去。
 - Flyway migration 只能新增，不改不刪，確保 rollback 回上一版 image 還能跑。
 
 ### 13.4 要建的 AWS 資源（寫成腳本，經授權才執行）

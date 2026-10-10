@@ -6,11 +6,10 @@ on:
   workflow_dispatch:
     inputs:
       sha:
-        description: Commit to deploy, e.g. to roll back (default is the head of main)
+        description: Full 40-character commit SHA to deploy, e.g. to roll back (default is the head of main)
         required: false
 
 permissions:
-  id-token: write
   contents: read
 
 concurrency:
@@ -18,14 +17,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    # No `environment:` here: it would change the OIDC sub claim and break the role's branch condition.
+  # Tests get no id-token permission, so code under test can never assume the deploy role.
+  test:
     if: vars.DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    env:
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-      SSM_INSTANCE_ID: ${{ vars.SSM_INSTANCE_ID }}
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -39,7 +36,6 @@ jobs:
           git merge-base --is-ancestor "$sha" origin/main || { echo "$sha is not on main"; exit 1; }
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
-      # Tests run before any AWS credentials exist in the job.
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -48,6 +44,23 @@ jobs:
 
       - name: Test
         run: mvn -B verify
+
+  deploy:
+    # No `environment:` here: it would change the OIDC sub claim and break the role's branch condition.
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      SSM_INSTANCE_ID: ${{ vars.SSM_INSTANCE_ID }}
+      SHA: ${{ needs.test.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.test.outputs.sha }}
 
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
@@ -59,8 +72,6 @@ jobs:
 
       - name: Check whether the image already exists
         id: image
-        env:
-          SHA: ${{ steps.commit.outputs.sha }}
         run: |
           if aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$SHA" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
@@ -71,14 +82,12 @@ jobs:
       - name: Build and push the image
         if: steps.image.outputs.exists == 'false'
         env:
-          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ steps.commit.outputs.sha }}
+          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ needs.test.outputs.sha }}
         run: |
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
 
       - name: Run deploy.sh on the host
-        env:
-          SHA: ${{ steps.commit.outputs.sha }}
         run: |
           # Ship the compose file and scripts from this commit, so the host always runs the matching versions.
           compose_b64="$(base64 -w0 infra/host/docker-compose.yml)"

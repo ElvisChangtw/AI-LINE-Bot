@@ -43,6 +43,7 @@ if ! aws iam get-open-id-connect-provider --open-id-connect-provider-arn "$OIDC_
 fi
 
 TARGET_INSTANCES="arn:aws:ssm:${AWS_REGION}:${ACCOUNT}:managed-instance/${SSM_INSTANCE_ID:-*}"
+[[ -n "${SSM_INSTANCE_ID:-}" ]] || echo "warning: SSM_INSTANCE_ID not set; the deploy role may run commands on every managed instance in the account" >&2
 
 echo "== deploy role (GitHub Actions, main branch only)"
 # Deploy jobs must not use `environment:`, or the sub claim stops matching the branch condition.
