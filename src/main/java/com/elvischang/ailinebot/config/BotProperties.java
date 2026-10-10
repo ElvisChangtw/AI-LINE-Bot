@@ -12,7 +12,6 @@ public record BotProperties(
         Duration materialTtl,
         Duration waitingTtl,
         Duration recentWindow,
-        int selfMaterialMinChars,
         Duration jobLease,
         int jobMaxAttempts,
         Duration staleAfter,

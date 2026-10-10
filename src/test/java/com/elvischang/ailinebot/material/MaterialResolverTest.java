@@ -58,33 +58,33 @@ class MaterialResolverTest extends IntegrationTestSupport {
     }
 
     @Test
-    void longMentionTextIsItsOwnMaterial() {
-        assertThat(resolve("聽說六十五歲以上每個人都可以領五千元是真的嗎", null))
-                .isInstanceOfSatisfying(Resolution.FactCheck.class,
-                        f -> assertThat(f.material().messageId()).isEqualTo("trigger"));
+    void mentionTextWithoutAQuoteIsSentAsAQuestionOnly() {
+        put("recent", MaterialKind.TEXT, MediaStatus.NONE, false, NOW - 60_000);
+        assertThat(resolve("聽說六十五歲以上每個人都可以領五千元是真的嗎", null)).isEqualTo(new Resolution.QuestionOnly());
+        assertThat(resolve("真的嗎", null)).isEqualTo(new Resolution.QuestionOnly());
     }
 
     @Test
     void usesTheOnlyRecentCandidate() {
         put("recent", MaterialKind.TEXT, MediaStatus.NONE, false, NOW - 60_000);
         put("tooOld", MaterialKind.TEXT, MediaStatus.NONE, false, NOW - 11 * 60_000);
-        assertThat(resolve("真的嗎", null)).isInstanceOfSatisfying(Resolution.FactCheck.class,
+        assertThat(resolve("", null)).isInstanceOfSatisfying(Resolution.FactCheck.class,
                 f -> assertThat(f.material().messageId()).isEqualTo("recent"));
     }
 
     @Test
     void asksToQuoteWhenNothingOrTooMuchIsRecent() {
-        assertThat(resolve("真的嗎", null)).isEqualTo(new Resolution.Notice(BotReplies.ASK_TO_QUOTE));
+        assertThat(resolve("", null)).isEqualTo(new Resolution.Notice(BotReplies.ASK_TO_QUOTE));
         put("a", MaterialKind.TEXT, MediaStatus.NONE, false, NOW - 60_000);
         put("b", MaterialKind.IMAGE, MediaStatus.STORED, false, NOW - 30_000);
-        assertThat(resolve("真的嗎", null)).isEqualTo(new Resolution.Notice(BotReplies.TOO_MANY_CANDIDATES));
+        assertThat(resolve("", null)).isEqualTo(new Resolution.Notice(BotReplies.TOO_MANY_CANDIDATES));
     }
 
     @Test
     void botsOwnRecentReplyIsNotACandidate() {
         put("bot", MaterialKind.BOT_REPLY, MediaStatus.NONE, false, NOW - 10_000);
         put("a", MaterialKind.TEXT, MediaStatus.NONE, false, NOW - 60_000);
-        assertThat(resolve("真的嗎", null)).isInstanceOfSatisfying(Resolution.FactCheck.class,
+        assertThat(resolve("", null)).isInstanceOfSatisfying(Resolution.FactCheck.class,
                 f -> assertThat(f.material().messageId()).isEqualTo("a"));
     }
 

@@ -66,7 +66,7 @@ class JobFlowTest extends IntegrationTestSupport {
     void ambiguousMentionGetsANoticeWithoutCheckingAnything() throws Exception {
         stubReplyOk("900");
         postWebhook(body(groupText("e1", "Cg1", "98", "第一則"), groupText("e2", "Cg1", "99", "第二則")));
-        postWebhook(body(groupMention("e3", "Cg1", "100", "真的嗎", null)));
+        postWebhook(body(groupMention("e3", "Cg1", "100", "", null)));
 
         awaitSendState("100", SendState.REPLIED);
         assertThat(factChecks.calls()).isEmpty();

@@ -159,6 +159,8 @@ public class WebhookIngestService {
         return switch (resolution) {
             case Resolution.FactCheck f -> new NewJob(JobKind.FACT_CHECK, chatId, text.id(),
                     f.material().messageId(), body, replyToken, text.quoteToken(), null);
+            case Resolution.QuestionOnly q -> new NewJob(JobKind.FACT_CHECK, chatId, text.id(),
+                    null, body, replyToken, text.quoteToken(), null);
             case Resolution.Imagine i -> new NewJob(JobKind.IMAGINE, chatId, text.id(),
                     null, i.prompt(), replyToken, text.quoteToken(), null);
             case Resolution.Notice n -> new NewJob(JobKind.NOTICE, chatId, text.id(),

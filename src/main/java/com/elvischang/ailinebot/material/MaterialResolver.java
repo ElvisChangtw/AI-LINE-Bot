@@ -32,10 +32,9 @@ public class MaterialResolver {
                     .map(this::checkable)
                     .orElse(new Resolution.Notice(BotReplies.QUOTE_NOT_FOUND));
         }
-        if (text.codePointCount(0, text.length()) >= props.selfMaterialMinChars()) {
-            return materials.find(trigger.groupId(), trigger.messageId())
-                    .<Resolution>map(Resolution.FactCheck::new)
-                    .orElse(new Resolution.Notice(BotReplies.ASK_TO_QUOTE));
+        // Attaching a recent message to an unrelated question would send a family member's words for no reason.
+        if (!text.isBlank()) {
+            return new Resolution.QuestionOnly();
         }
         long since = now - props.recentWindow().toMillis();
         List<Material> candidates = materials.recentCandidates(trigger.groupId(), since, trigger.messageId());

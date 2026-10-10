@@ -46,7 +46,6 @@ bot:
   material-ttl: 7d
   waiting-ttl: 24h
   recent-window: 10m
-  self-material-min-chars: 20
   job-lease: 5m
   job-max-attempts: 3
   stale-after: 30s

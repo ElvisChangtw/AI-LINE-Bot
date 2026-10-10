@@ -109,15 +109,25 @@ class WebhookIngestServiceTest extends IntegrationTestSupport {
 
     @Test
     void ambiguousMentionCreatesANoticeJob() {
-        ingest.ingest(parse(body(groupMention("e1", "Cg1", "100", "真的嗎", null))));
+        ingest.ingest(parse(body(groupMention("e1", "Cg1", "100", "", null))));
         Job job = allJobs().getFirst();
         assertThat(job.kind()).isEqualTo(JobKind.NOTICE);
         assertThat(job.resultText()).isEqualTo(BotReplies.ASK_TO_QUOTE);
     }
 
     @Test
+    void questionWithoutAQuoteCreatesAJobWithoutMaterial() {
+        ingest.ingest(parse(body(groupText("e1", "Cg1", "99", "家人剛傳的訊息"))));
+        ingest.ingest(parse(body(groupMention("e2", "Cg1", "100", "明天台北會下雨嗎", null))));
+        Job job = allJobs().getFirst();
+        assertThat(job.kind()).isEqualTo(JobKind.FACT_CHECK);
+        assertThat(job.materialMessageId()).isNull();
+        assertThat(job.userQuestion()).isEqualTo("明天台北會下雨嗎");
+    }
+
+    @Test
     void redeliveredEventIsIgnored() {
-        String webhook = body(groupMention("e1", "Cg1", "100", "真的嗎", null));
+        String webhook = body(groupMention("e1", "Cg1", "100", "", null));
         ingest.ingest(parse(webhook));
         ingest.ingest(parse(webhook));
         assertThat(count("job")).isEqualTo(1);
@@ -146,7 +156,7 @@ class WebhookIngestServiceTest extends IntegrationTestSupport {
         assertThat(materials.find("Cg1", "99")).isEmpty();
         assertThat(file).doesNotExist();
 
-        ingest.ingest(parse(body(groupMention("e3", "Cg1", "100", "真的嗎", null))));
+        ingest.ingest(parse(body(groupMention("e3", "Cg1", "100", "", null))));
         Job job = allJobs().getFirst();
         assertThat(job.kind()).isEqualTo(JobKind.NOTICE);
         assertThat(job.resultText()).isEqualTo(BotReplies.ASK_TO_QUOTE);
@@ -192,7 +202,7 @@ class WebhookIngestServiceTest extends IntegrationTestSupport {
     @Test
     void mentionCarriesWaitingResultsOnItsOwnJob() {
         String waiting = waitingResult("Cg1");
-        ingest.ingest(parse(body(groupMention("e1", "Cg1", "100", "真的嗎", null))));
+        ingest.ingest(parse(body(groupMention("e1", "Cg1", "100", "", null))));
 
         Job notice = allJobs().stream().filter(j -> j.kind() == JobKind.NOTICE).findFirst().orElseThrow();
         assertThat(jobs.find(waiting).orElseThrow().carrierJobId()).isEqualTo(notice.id());
@@ -216,7 +226,7 @@ class WebhookIngestServiceTest extends IntegrationTestSupport {
         for (int i = 0; i < 6; i++) {
             waitingResult("Cg1");
         }
-        ingest.ingest(parse(body(groupMention("e1", "Cg1", "100", "真的嗎", null))));
+        ingest.ingest(parse(body(groupMention("e1", "Cg1", "100", "", null))));
 
         Job notice = allJobs().stream().filter(j -> j.kind() == JobKind.NOTICE).findFirst().orElseThrow();
         assertThat(jobs.carried(notice.id())).hasSize(4);
