@@ -162,4 +162,18 @@ class ReplyFormatterTest {
         assertThat(text.length()).isLessThanOrEqualTo(300);
         assertThat(text).startsWith("【回答】明天台北會下雨，傘記得帶\n・");
     }
+
+    @Test
+    void aHighRiskAnswerKeepsOneSourceWhenItHasToBeShortened() {
+        FactCheckResult.Source longGov = new FactCheckResult.Source(
+                "https://www.mohw.gov.tw/cp-" + "1".repeat(80) + ".html", "t", "衛生福利部", "2026-09-01");
+        FactCheckResult risky = new FactCheckResult(Verdict.NOT_APPLICABLE, false, "葡萄柚先不要配降血壓藥", List.of(), true,
+                List.of(longGov, longGov), ReplyMode.ANSWER, true, List.of("很長的說明".repeat(20), "第二點".repeat(20)));
+
+        String text = ReplyFormatter.format(risky, true);
+
+        assertThat(text.length()).isLessThanOrEqualTo(300);
+        assertThat(text).contains("來源：衛生福利部（2026-09-01）\n" + longGov.url()).contains(BotReplies.SAFETY_TIP)
+                .doesNotContain("第二點");
+    }
 }

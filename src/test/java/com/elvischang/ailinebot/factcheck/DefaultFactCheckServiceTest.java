@@ -80,7 +80,7 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
         when(checker.check(any())).thenReturn(new ModelCheck(RESULT, Set.of("https://tfc-taiwan.org.tw/?p=108215"), new Usage(20_000, 4_000, 3)));
 
         FactCheckReply first = ask(text("Cg1", "1", "按1 手機被屏蔽 https://x.example"), "真的嗎");
-        FactCheckReply second = ask(text("Cg2", "2", "按1   手機被屏蔽 https://x.example"), " 真的嗎  ");
+        FactCheckReply second = ask(text("Cg2", "2", "按1\u3000手機被屏蔽 https://x.example"), " 真的嗎\u3000");
 
         assertThat(first.text()).startsWith("【查證結果】這是假消息，舊謠言")
                 .contains(BotReplies.LINK_NOT_OPENED)
@@ -238,5 +238,30 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
 
         verify(checker, times(4)).check(any());
         assertThat(jdbc.sql("SELECT COUNT(*) FROM verification_cache").query(Integer.class).single()).isZero();
+    }
+
+    @Test
+    void aLinkInTheQuestionAlsoGetsTheNotOpenedNote() {
+        when(checker.check(any())).thenReturn(answer(ReplyMode.ANSWER));
+
+        assertThat(service.verify("Cg1", null, "這個 https://x.example 能點嗎").text()).contains(BotReplies.LINK_NOT_OPENED);
+    }
+
+    @Test
+    void askingForMaterialThatWasQuotedIsAnInvalidModelOutput() {
+        when(checker.check(any())).thenReturn(answer(ReplyMode.NEED_MATERIAL));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ask(text("Cg1", "1", "按1 手機被屏蔽"), "這是真的嗎"))
+                .isInstanceOf(InvalidModelOutputException.class);
+    }
+
+    @Test
+    void aHighRiskAnswerWhoseSourcesWereMadeUpGetsTheFixedReply() {
+        FactCheckResult madeUp = new FactCheckResult(Verdict.NOT_APPLICABLE, false, "沒問題", List.of(), false,
+                List.of(new FactCheckResult.Source("https://made.up/x", "t", "假", "")), ReplyMode.ANSWER, true,
+                List.of("可以一起吃"));
+        when(checker.check(any())).thenReturn(new ModelCheck(madeUp, Set.of("https://www.mohw.gov.tw/a"), Usage.NONE));
+
+        assertThat(service.verify("Cg1", null, "降血壓藥可以配葡萄柚嗎").text()).isEqualTo(BotReplies.HIGH_RISK_NO_SOURCE);
     }
 }

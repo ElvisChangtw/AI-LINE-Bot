@@ -27,7 +27,7 @@ public class DefaultFactCheckService implements FactCheckService {
     private static final Logger log = LoggerFactory.getLogger(DefaultFactCheckService.class);
     private static final ZoneId TAIPEI = ZoneId.of("Asia/Taipei");
     private static final Pattern LINK = Pattern.compile("https?://", Pattern.CASE_INSENSITIVE);
-    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS);
 
     private final FactChecker checker;
     private final VerificationCacheRepository cache;
@@ -68,7 +68,8 @@ public class DefaultFactCheckService implements FactCheckService {
     }
 
     private FactCheckReply check(String groupId, String text, byte[] image, String imageSha256, String userQuestion) {
-        boolean hasLink = text != null && LINK.matcher(text).find();
+        boolean hasLink = (text != null && LINK.matcher(text).find())
+                || (userQuestion != null && LINK.matcher(userQuestion).find());
         long now = clock.millis();
         String key = cacheKey(userQuestion, text, imageSha256);
 
@@ -83,6 +84,9 @@ public class DefaultFactCheckService implements FactCheckService {
         }
         ModelCheck check = checker.check(new FactCheckInput(text, image, image == null ? null : mimeType(image),
                 userQuestion, LocalDate.now(clock.withZone(TAIPEI))));
+        if (check.result().mode() == ReplyMode.NEED_MATERIAL && (text != null || image != null)) {
+            throw new InvalidModelOutputException("asked for material that was already sent");
+        }
         FactCheckResult filtered = CitationFilter.apply(check.result(), check.consultedUrls());
         // Answers go stale (weather, news) and new rumours often get fact-checked hours later, so neither may stick.
         if (filtered.mode() == ReplyMode.FACT_CHECK && filtered.overall() != Verdict.INSUFFICIENT_EVIDENCE) {

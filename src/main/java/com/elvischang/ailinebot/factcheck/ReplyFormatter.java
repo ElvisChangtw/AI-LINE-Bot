@@ -55,7 +55,9 @@ public final class ReplyFormatter {
         if (materialHasLink) {
             notes.add(BotReplies.LINK_NOT_OPENED);
         }
-        return fit(ANSWER_PREFIX + headline, points, notes, sources(result), MAX_ANSWER_LENGTH);
+        // A high-risk answer may only go out with the source that backs it.
+        int minSources = result.highRisk() ? 1 : 0;
+        return fit(ANSWER_PREFIX + headline, points, notes, sources(result), MAX_ANSWER_LENGTH, minSources);
     }
 
     private static List<String> bullets(List<String> modelTexts) {
@@ -92,17 +94,23 @@ public final class ReplyFormatter {
                 || result.overall() == Verdict.OUTDATED_OR_MISSING_CONDITIONS)) {
             notes.add(BotReplies.NO_FORWARD_NEEDED);
         }
-        return fit(header, reasons, notes, sources(result), MAX_LENGTH);
+        return fit(header, reasons, notes, sources(result), MAX_LENGTH, 0);
     }
 
-    private static String fit(String header, List<String> lines, List<String> notes, List<String> sources, int maxLength) {
+    private static String fit(String header, List<String> lines, List<String> notes, List<String> sources,
+                              int maxLength, int minSources) {
         String text = join(header, lines, notes, sources);
-        while (text.length() > maxLength && !sources.isEmpty()) {
+        while (text.length() > maxLength && sources.size() > minSources) {
             sources.remove(sources.size() - 1);
             text = join(header, lines, notes, sources);
         }
         while (text.length() > maxLength && lines.size() > 1) {
             lines.remove(lines.size() - 1);
+            text = join(header, lines, notes, sources);
+        }
+        int keep = lines.isEmpty() ? 0 : lines.getFirst().length() - (text.length() - maxLength) - 1;
+        if (text.length() > maxLength && minSources > 0 && keep > BULLET.length()) {
+            lines.set(0, lines.getFirst().substring(0, keep) + "…");
             text = join(header, lines, notes, sources);
         }
         return text.length() > maxLength ? text.substring(0, maxLength - 1) + "…" : text;

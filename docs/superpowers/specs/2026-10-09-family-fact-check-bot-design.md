@@ -344,7 +344,7 @@ schema v2 加上這些欄位（strict 模式，每個欄位都必填，用不到
 | `answer_points` | 一般問答用，最多 2 點，每點 40 字以內 |
 | `political`、`safety_tip`、`sources` | 兩種 mode 共用，規則同上 |
 
-strict schema 只保證欄位都在，不保證前後一致，所以 parser 另外驗證：`FACT_CHECK` 的判讀不能是 `NOT_APPLICABLE`；`ANSWER` 至少要有 1 點，而且判讀是 `NOT_APPLICABLE`；`NEED_MATERIAL` 的判讀是 `NOT_APPLICABLE`。不一致就丟 `InvalidModelOutputException`，走既有的重試，最後回 `JOB_FAILED`。
+strict schema 只保證欄位都在，不保證前後一致，所以 parser 另外驗證：`FACT_CHECK` 的判讀不能是 `NOT_APPLICABLE`；`ANSWER` 至少要有 1 點，而且判讀是 `NOT_APPLICABLE`；`NEED_MATERIAL` 的判讀是 `NOT_APPLICABLE`。不一致就丟 `InvalidModelOutputException`，走既有的重試，最後回 `JOB_FAILED`。已經送了素材，模型卻回 `NEED_MATERIAL`，也算不一致（parser 不知道有沒有素材，由 service 檢查）。
 
 `high_risk` 由模型標，程式只負責強制它的後果（§9）。模型把用藥題標成低風險，程式擋不住；不加關鍵字備援，改用 eval 量模型標得準不準（§15）。
 
@@ -378,7 +378,7 @@ key = sha256（prompt 版本＋model＋正規化後的提問＋正規化後的�
 - 最多 3 條理由、最多 2 個來源。
 - 收尾句：`INCORRECT` 或 `OUTDATED_OR_MISSING_CONDITIONS`，而且 `political = false` 時，加「不用擔心，這則可以不用再轉傳囉」。
 - `safetyTip`：跟錢、連結、個資、驗證碼有關時，加「不要點連結、不要給驗證碼和帳號密碼，不放心可以打 165 問」。
-- 素材裡的網址沒有打開時，加「（我沒有打開訊息裡的連結）」。
+- 素材裡的網址沒有打開時，加「（我沒有打開訊息裡的連結）」。2026-10-10：提問裡有網址時也加。
 - 禁止的寫法：提到是誰轉傳的、「你又…」「不要再傳假消息」之類責怪的語氣。
 - 判讀結果是對的，也一樣要回覆。
 
@@ -394,7 +394,7 @@ key = sha256（prompt 版本＋model＋正規化後的提問＋正規化後的�
 {url}
 ```
 
-- `ANSWER` 整則上限 300 字（查證維持 500），超過時先砍來源再砍條目。不加「不用再轉傳」。
+- `ANSWER` 整則上限 300 字（查證維持 500），超過時先砍來源再砍條目。不加「不用再轉傳」。高風險答案至少保留 1 個來源：砍到剩 1 個來源就改砍條目，還太長就截短第一條。
 - `ANSWER` 而且 `high_risk = true`，來源被 `CitationFilter` 全部丟光：不送模型的答案，改送固定文字「這題我查不到可靠的資料，不敢亂回答。健康、用藥請問醫師或藥師；補助、法規可以打 1999 問。」
 - `ANSWER` 而且低風險、沒來源：照答，不附來源。
 - `NEED_MATERIAL`：送「請引用你要查的那則訊息，再 @ 我」。
