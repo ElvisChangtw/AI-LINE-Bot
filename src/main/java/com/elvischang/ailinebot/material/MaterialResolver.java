@@ -3,6 +3,7 @@ package com.elvischang.ailinebot.material;
 import com.elvischang.ailinebot.config.BotProperties;
 import com.elvischang.ailinebot.delivery.BotReplies;
 import com.elvischang.ailinebot.store.Material;
+import com.elvischang.ailinebot.store.MaterialKind;
 import com.elvischang.ailinebot.store.MaterialRepository;
 import org.springframework.stereotype.Component;
 
@@ -29,7 +30,7 @@ public class MaterialResolver {
         }
         if (trigger.quotedMessageId() != null) {
             return materials.find(trigger.groupId(), trigger.quotedMessageId())
-                    .map(this::checkable)
+                    .map(m -> isFollowUp(m, text) ? new Resolution.FactCheck(m) : checkable(m))
                     .orElse(new Resolution.Notice(BotReplies.QUOTE_NOT_FOUND));
         }
         // The job looks back only if the model says the question is about a message it cannot see.
@@ -38,10 +39,15 @@ public class MaterialResolver {
         }
         // A bare mention means "that message above"; the job picks which one once it runs.
         long since = now - props.recentWindow().toMillis();
-        if (materials.recentCandidates(trigger.groupId(), since, now, trigger.messageId()).isEmpty()) {
+        if (materials.recentCandidates(trigger.groupId(), since, now, trigger.messageId(), false).isEmpty()) {
             return new Resolution.Notice(BotReplies.ASK_TO_QUOTE);
         }
         return new Resolution.QuestionOnly();
+    }
+
+    // Asking something about our own earlier answer is a follow-up; just quoting it is not.
+    private static boolean isFollowUp(Material material, String text) {
+        return material.kind() == MaterialKind.BOT_REPLY && material.text() != null && !Questions.normalize(text).isEmpty();
     }
 
     private Resolution checkable(Material material) {

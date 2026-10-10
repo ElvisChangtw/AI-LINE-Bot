@@ -51,6 +51,7 @@ class MaterialResolverTest extends IntegrationTestSupport {
         put("big", MaterialKind.IMAGE, MediaStatus.TOO_LARGE, false, NOW);
         put("ok", MaterialKind.IMAGE, MediaStatus.PENDING, false, NOW);
         assertThat(resolve("?", "bot")).isEqualTo(new Resolution.Notice(BotReplies.QUOTED_BOT_REPLY));
+        assertThat(resolve("為什麼這樣說", "bot")).isInstanceOf(Resolution.FactCheck.class);
         assertThat(resolve("?", "voice")).isEqualTo(new Resolution.Notice(BotReplies.MEDIA_UNSUPPORTED));
         assertThat(resolve("?", "gone")).isEqualTo(new Resolution.Notice(BotReplies.IMAGE_GONE));
         assertThat(resolve("?", "big")).isEqualTo(new Resolution.Notice(BotReplies.IMAGE_TOO_LARGE));

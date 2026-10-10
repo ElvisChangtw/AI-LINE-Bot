@@ -9,6 +9,7 @@ import com.elvischang.ailinebot.factcheck.InvalidModelOutputException;
 import com.elvischang.ailinebot.factcheck.ReplyMode;
 import com.elvischang.ailinebot.line.Hashes;
 import com.elvischang.ailinebot.line.SenderNames;
+import com.elvischang.ailinebot.material.Questions;
 import com.elvischang.ailinebot.material.RecentMaterialPicker;
 import com.elvischang.ailinebot.service.ImageGenerationService;
 import com.elvischang.ailinebot.store.Job;
@@ -93,14 +94,16 @@ public class JobRunner {
     }
 
     private String factCheck(Job job) {
+        String question = Questions.normalize(job.userQuestion());
         if (job.materialMessageId() != null) {
             Optional<Material> found = materials.find(job.groupId(), job.materialMessageId());
             if (found.isEmpty()) {
                 return BotReplies.QUOTE_NOT_FOUND;
             }
-            return recorded(job, factCheckService.verify(job.groupId(), found.get(), job.userQuestion()));
+            Material material = found.get().kind() == MaterialKind.BOT_REPLY
+                    ? RecentMaterialPicker.asFollowUp(found.get()) : found.get();
+            return recorded(job, factCheckService.verify(job.groupId(), material, question));
         }
-        String question = job.userQuestion() == null ? "" : job.userQuestion();
         FactCheckReply firstPass = null;
         if (!question.isBlank()) {
             firstPass = factCheckService.verify(job.groupId(), null, question);
@@ -108,7 +111,9 @@ public class JobRunner {
                 return recorded(job, firstPass);
             }
         }
-        Optional<RecentMaterialPicker.Picked> picked = picker.pick(job.groupId(), job.triggerMessageId(), job.createdAt());
+        // Only a real question can be about our own last answer; a bare "is this true" means the message above.
+        Optional<RecentMaterialPicker.Picked> picked = picker.pick(job.groupId(), job.triggerMessageId(), job.createdAt(),
+                firstPass != null);
         if (picked.isEmpty()) {
             return firstPass == null ? BotReplies.ASK_TO_QUOTE : recorded(job, firstPass);
         }
@@ -127,6 +132,9 @@ public class JobRunner {
             // We guessed the message; if the model still cannot use it, asking beats retrying the guess.
             log.info("look-back unusable jobId={} cause={}", job.id(), e.getMessage());
             return BotReplies.ASK_TO_QUOTE;
+        }
+        if (picked.ownReply()) {
+            return recorded(job, reply);
         }
         String name = senderNames.displayName(job.groupId(), picked.senderId()).orElse(null);
         return BotReplies.lookedAt(name, material.createdAt(), material.text()) + recorded(job, reply);

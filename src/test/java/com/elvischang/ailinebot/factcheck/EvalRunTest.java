@@ -1,5 +1,7 @@
 package com.elvischang.ailinebot.factcheck;
 
+import com.elvischang.ailinebot.material.Questions;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Tag;
@@ -54,7 +56,7 @@ class EvalRunTest {
             long billedBefore = billed.get();
             try {
                 String text = sample.hasNonNull("text") ? sample.get("text").asText() : null;
-                String question = sample.hasNonNull("question") ? sample.get("question").asText() : QUESTION;
+                String question = Questions.normalize(sample.hasNonNull("question") ? sample.get("question").asText() : QUESTION);
                 ModelCheck check = checker.check(new FactCheckInput(text, null, null, question, LocalDate.now()));
                 FactCheckResult filtered = CitationFilter.apply(check.result(), check.consultedUrls());
                 actual = actual(sample, filtered);

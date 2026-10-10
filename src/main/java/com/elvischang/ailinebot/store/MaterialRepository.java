@@ -76,11 +76,13 @@ public class MaterialRepository {
                 .list();
     }
 
-    public List<RecentMessage> recentCandidates(String groupId, long since, long until, String excludeMessageId) {
+    public List<RecentMessage> recentCandidates(String groupId, long since, long until, String excludeMessageId,
+                                                boolean includeBotReplies) {
         return jdbc.sql("""
                         SELECT * FROM material
                         WHERE group_id = :g AND created_at >= :since AND created_at <= :until AND message_id <> :exclude
-                          AND is_bot_trigger = 0 AND kind <> 'BOT_REPLY'
+                          AND is_bot_trigger = 0
+                          AND (kind <> 'BOT_REPLY' OR (:bot = 1 AND text IS NOT NULL))
                         ORDER BY created_at DESC
                         LIMIT 5
                         """)
@@ -88,6 +90,7 @@ public class MaterialRepository {
                 .param("since", since)
                 .param("until", until)
                 .param("exclude", excludeMessageId)
+                .param("bot", includeBotReplies ? 1 : 0)
                 .query((rs, n) -> new RecentMessage(MAPPER.mapRow(rs, n), rs.getString("sender_id")))
                 .list();
     }

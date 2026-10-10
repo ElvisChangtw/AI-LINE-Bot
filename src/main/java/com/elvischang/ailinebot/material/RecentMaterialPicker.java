@@ -18,6 +18,8 @@ public class RecentMaterialPicker {
 
     // A link and its explanation usually arrive as separate bubbles seconds apart.
     static final Duration SAME_SENDER_GAP = Duration.ofMinutes(2);
+    // Tells the model the material is its own earlier answer, so it explains or corrects itself.
+    public static final String EARLIER_BOT_REPLY = "（這是 AskBot 之前在群組的回覆，家人在追問它）\n";
 
     private final MaterialRepository materials;
     private final BotProperties props;
@@ -27,12 +29,17 @@ public class RecentMaterialPicker {
         this.props = props;
     }
 
-    public record Picked(Material material, String senderId) {
+    public record Picked(Material material, String senderId, boolean ownReply) {
     }
 
-    public Optional<Picked> pick(String groupId, String triggerMessageId, long triggerAt) {
+    public Optional<Picked> pick(String groupId, String triggerMessageId, long triggerAt, boolean includeBotReplies) {
         long since = triggerAt - props.recentWindow().toMillis();
-        return latestRun(materials.recentCandidates(groupId, since, triggerAt, triggerMessageId));
+        return latestRun(materials.recentCandidates(groupId, since, triggerAt, triggerMessageId, includeBotReplies));
+    }
+
+    public static Material asFollowUp(Material botReply) {
+        return new Material(botReply.groupId(), botReply.messageId(), MaterialKind.TEXT, EARLIER_BOT_REPLY + botReply.text(),
+                false, botReply.mediaStatus(), null, 0, botReply.createdAt(), botReply.expiresAt());
     }
 
     static Optional<Picked> latestRun(List<RecentMessage> newestFirst) {
@@ -40,8 +47,11 @@ public class RecentMaterialPicker {
             return Optional.empty();
         }
         RecentMessage latest = newestFirst.getFirst();
+        if (latest.material().kind() == MaterialKind.BOT_REPLY) {
+            return Optional.of(new Picked(asFollowUp(latest.material()), null, true));
+        }
         if (latest.material().kind() != MaterialKind.TEXT) {
-            return Optional.of(new Picked(latest.material(), latest.senderId()));
+            return Optional.of(new Picked(latest.material(), latest.senderId(), false));
         }
         List<Material> run = new ArrayList<>(List.of(latest.material()));
         for (RecentMessage older : newestFirst.subList(1, newestFirst.size())) {
@@ -57,6 +67,6 @@ public class RecentMaterialPicker {
         Material newest = latest.material();
         Material merged = new Material(newest.groupId(), newest.messageId(), MaterialKind.TEXT, String.join("\n", texts),
                 false, newest.mediaStatus(), null, 0, run.getLast().createdAt(), newest.expiresAt());
-        return Optional.of(new Picked(merged, latest.senderId()));
+        return Optional.of(new Picked(merged, latest.senderId(), false));
     }
 }

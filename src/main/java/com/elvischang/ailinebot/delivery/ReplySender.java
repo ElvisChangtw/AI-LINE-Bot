@@ -79,7 +79,7 @@ public class ReplySender {
         switch (outcome.status()) {
             case SENT -> {
                 jobs.setSendState(allIds, SendState.REPLIED);
-                recordBotReplies(carrier.groupId(), outcome.sentMessages(), now);
+                recordBotReplies(carrier.groupId(), outcome.sentMessages(), quoted, now);
             }
             case REJECTED -> toWaiting(carrier, deliverables, now);
             case UNKNOWN -> jobs.setSendState(allIds, SendState.UNKNOWN);
@@ -147,10 +147,12 @@ public class ReplySender {
         return new TextMessage(null, null, text, null, withQuote && isQuoted(job) ? job.quoteToken() : null);
     }
 
-    private void recordBotReplies(String groupId, List<SentMessage> sent, long now) {
+    // LINE returns sentMessages in the order we sent them; quoted and unquoted versions carry the same text.
+    private void recordBotReplies(String groupId, List<SentMessage> sent, List<Message> messages, long now) {
         long expiresAt = now + props.materialTtl().toMillis();
-        for (SentMessage message : sent) {
-            materials.insert(new Material(groupId, message.id(), MaterialKind.BOT_REPLY, null, false,
+        for (int i = 0; i < sent.size(); i++) {
+            String text = i < messages.size() && messages.get(i) instanceof TextMessage t ? t.text() : null;
+            materials.insert(new Material(groupId, sent.get(i).id(), MaterialKind.BOT_REPLY, text, false,
                     MediaStatus.NONE, null, 0, now, expiresAt));
         }
     }

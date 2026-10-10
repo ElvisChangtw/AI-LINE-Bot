@@ -41,7 +41,7 @@ bot:
   reply-timeout: 15s
   material-ttl: 7d
   waiting-ttl: 24h
-  recent-window: 10m
+  recent-window: 30m
   job-lease: 5m
   job-max-attempts: 3
   stale-after: 30s
@@ -72,4 +72,4 @@ factcheck:
   daily-limit-micro-usd: 2000000
   monthly-limit-micro-usd: 10000000
   cache-ttl: 24h
-  prompt-version: v5
+  prompt-version: v6

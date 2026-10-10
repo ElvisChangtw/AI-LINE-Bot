@@ -42,7 +42,7 @@ class MaterialRepositoryTest extends IntegrationTestSupport {
         materials.insert(text("Cg1", "self", 140, false));
         materials.insert(text("Cg1", "afterTheTrigger", 200, false));
 
-        assertThat(materials.recentCandidates("Cg1", 50, 150, "self"))
+        assertThat(materials.recentCandidates("Cg1", 50, 150, "self", false))
                 .extracting(r -> r.material().messageId(), RecentMessage::senderId).containsExactly(tuple("a", "U1"));
     }
 
@@ -51,7 +51,7 @@ class MaterialRepositoryTest extends IntegrationTestSupport {
         for (int i = 0; i < 6; i++) {
             materials.insert(text("Cg1", "c" + i, 100 + i, false));
         }
-        assertThat(materials.recentCandidates("Cg1", 0, Long.MAX_VALUE, "none"))
+        assertThat(materials.recentCandidates("Cg1", 0, Long.MAX_VALUE, "none", false))
                 .extracting(r -> r.material().messageId()).containsExactly("c5", "c4", "c3", "c2", "c1");
     }
 

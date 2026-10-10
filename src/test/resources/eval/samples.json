@@ -241,5 +241,18 @@
     "text": "【健保署通知】您的健保卡即將停用，請於今日內點擊 https://nhi-gov-tw.top/card 更新資料以免影響就醫權益",
     "question": "這是真的嗎",
     "expected": "INCORRECT"
+  },
+  {
+    "id": "g16",
+    "category": "link",
+    "text": "https://www.nhi.gov.tw/ch/cp-20350-3012a-3255-1.html",
+    "expected": "CORRECT"
+  },
+  {
+    "id": "g17",
+    "category": "follow-up",
+    "text": "（這是 AskBot 之前在群組的回覆，家人在追問它）\n這是假消息，健保卡停卡連結是詐騙警訊\n・健保署已提醒，這類要求點不明連結的 LINE 訊息是詐騙，請勿點選。\n來源：衛生福利部中央健康保險署（2026-08-13）\nhttps://www.nhi.gov.tw/ch/cp-20350-3012a-3255-1.html",
+    "question": "那為何你還說是假消息",
+    "expected_mode": "ANSWER"
   }
 ]

@@ -7,6 +7,7 @@ import com.elvischang.ailinebot.store.JobRepository;
 import com.elvischang.ailinebot.store.JobStatus;
 import com.elvischang.ailinebot.store.SendState;
 import com.elvischang.ailinebot.support.IntegrationTestSupport;
+import com.elvischang.ailinebot.material.RecentMaterialPicker;
 import com.elvischang.ailinebot.support.RecordingFactCheckService;
 import com.elvischang.ailinebot.factcheck.InvalidModelOutputException;
 import org.junit.jupiter.api.Test;
@@ -101,7 +102,7 @@ class JobFlowTest extends IntegrationTestSupport {
         factChecks.askForMaterialWhenAlone();
         postWebhook(body(groupTextFrom("e0", "Cg1", "97", "別人的訊息", "Uother"),
                 groupText("e1", "Cg1", "98", "健保署公告"), groupText("e2", "Cg1", "99", "看到不要點")));
-        postWebhook(body(groupMention("e3", "Cg1", "100", "這是真的嗎", null)));
+        postWebhook(body(groupMention("e3", "Cg1", "100", "這個要轉傳給大家嗎", null)));
 
         awaitSendState("100", SendState.REPLIED);
         assertThat(factChecks.calls()).containsExactly(RecordingFactCheckService.QUESTION_ONLY, "99");
@@ -110,6 +111,24 @@ class JobFlowTest extends IntegrationTestSupport {
                 .withRequestBody(matchingJsonPath("$.messages[0].text", containing("（我看的是 媽媽 ")))
                 .withRequestBody(matchingJsonPath("$.messages[0].text", containing("傳的「健保署公告 看到不要點」")))
                 .withRequestBody(matchingJsonPath("$.messages[0].text", containing("TEST RESULT 99"))));
+    }
+
+    @Test
+    void followUpsAboutTheBotsOwnReplyGetThatReplyAsContext() throws Exception {
+        stubReplyOk("900");
+        postWebhook(body(groupText("e1", "Cg1", "99", "轉傳的訊息")));
+        postWebhook(body(groupMention("e2", "Cg1", "100", "這是真的嗎", "99")));
+        awaitSendState("100", SendState.REPLIED);
+        factChecks.askForMaterialWhenAlone();
+
+        postWebhook(body(groupMention("e3", "Cg1", "101", "為什麼說是假的", "900")));
+        awaitSendState("101", SendState.REPLIED);
+        postWebhook(body(groupMention("e4", "Cg1", "102", "那為何你還說是假消息", null)));
+        awaitSendState("102", SendState.REPLIED);
+
+        assertThat(factChecks.calls()).containsExactly("99", "900", RecordingFactCheckService.QUESTION_ONLY, "900");
+        assertThat(factChecks.materialTexts()).containsExactly("轉傳的訊息",
+                RecentMaterialPicker.EARLIER_BOT_REPLY + "TEST RESULT 99", RecentMaterialPicker.EARLIER_BOT_REPLY + "TEST RESULT 99");
     }
 
     @Test

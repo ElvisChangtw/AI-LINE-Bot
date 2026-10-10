@@ -13,7 +13,7 @@ class OpenAiLiveSpikeTest {
 
     static FactCheckProperties liveProps(String model) {
         return new FactCheckProperties("https://api.openai.com/v1", System.getenv("OPENAI_API_KEY"), model, "medium", 3,
-                Duration.ofSeconds(40), 100_000, 500_000, 10_000, 2_000_000, 40_000_000, Duration.ofHours(24), "v5");
+                Duration.ofSeconds(40), 100_000, 500_000, 10_000, 2_000_000, 40_000_000, Duration.ofHours(24), "v6");
     }
 
     @Test
