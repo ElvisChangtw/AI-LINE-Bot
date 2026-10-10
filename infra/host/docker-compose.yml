@@ -1,0 +1,38 @@
+# Production stack on the Lightsail host; deploy.sh sets ECR_REPO and APP_TAG.
+services:
+  app:
+    image: ${ECR_REPO:?ECR_REPO is required}:${APP_TAG:?APP_TAG is required}
+    env_file: /opt/linebot/app.env
+    expose: ["8080"]
+    mem_limit: 1g
+    # Longer than the app's 30-second graceful shutdown, so in-flight replies can finish.
+    stop_grace_period: 45s
+    environment:
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=60"
+    volumes:
+      - app-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.3
+    command: ["tunnel", "--no-autoupdate", "run"]
+    env_file: /opt/linebot/tunnel.env
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  app-data: {}
