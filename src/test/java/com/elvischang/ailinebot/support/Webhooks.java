@@ -45,6 +45,12 @@ public final class Webhooks {
                         .formatted(messageId, messageId, text));
     }
 
+    public static String groupTextFrom(String eventId, String groupId, String messageId, String text, String userId) {
+        return messageEvent(eventId, "{\"type\":\"group\",\"groupId\":\"" + groupId + "\",\"userId\":\"" + userId + "\"}",
+                "{\"type\":\"text\",\"id\":\"%s\",\"quoteToken\":\"qt-%s\",\"text\":\"%s\"}"
+                        .formatted(messageId, messageId, text));
+    }
+
     public static String groupMention(String eventId, String groupId, String messageId,
                                       String textAfterMention, String quotedMessageId) {
         String quoted = quotedMessageId == null ? "" : ",\"quotedMessageId\":\"" + quotedMessageId + "\"";

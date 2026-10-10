@@ -8,6 +8,7 @@ import com.elvischang.ailinebot.store.JobStatus;
 import com.elvischang.ailinebot.store.SendState;
 import com.elvischang.ailinebot.support.IntegrationTestSupport;
 import com.elvischang.ailinebot.support.RecordingFactCheckService;
+import com.elvischang.ailinebot.factcheck.InvalidModelOutputException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -17,6 +18,8 @@ import java.time.Duration;
 import static com.elvischang.ailinebot.support.Webhooks.body;
 import static com.elvischang.ailinebot.support.Webhooks.groupMention;
 import static com.elvischang.ailinebot.support.Webhooks.groupText;
+import static com.elvischang.ailinebot.support.Webhooks.groupTextFrom;
+import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
@@ -76,15 +79,46 @@ class JobFlowTest extends IntegrationTestSupport {
     }
 
     @Test
-    void ambiguousMentionGetsANoticeWithoutCheckingAnything() throws Exception {
+    void aBareMentionChecksTheLatestRunOfMessagesFromOneSender() throws Exception {
         stubReplyOk("900");
         postWebhook(body(groupText("e1", "Cg1", "98", "第一則"), groupText("e2", "Cg1", "99", "第二則")));
         postWebhook(body(groupMention("e3", "Cg1", "100", "", null)));
 
         awaitSendState("100", SendState.REPLIED);
-        assertThat(factChecks.calls()).isEmpty();
+        assertThat(factChecks.calls()).containsExactly("99");
+        assertThat(factChecks.materialTexts()).containsExactly("第一則\n第二則");
+    }
+
+    @Test
+    void aQuestionAboutAnUnquotedMessageLooksBackAndSaysWhichOne() throws Exception {
+        stubReplyOk("900");
+        factChecks.askForMaterialWhenAlone();
+        postWebhook(body(groupTextFrom("e0", "Cg1", "97", "別人的訊息", "Uother"),
+                groupText("e1", "Cg1", "98", "健保署公告"), groupText("e2", "Cg1", "99", "看到不要點")));
+        postWebhook(body(groupMention("e3", "Cg1", "100", "這是真的嗎", null)));
+
+        awaitSendState("100", SendState.REPLIED);
+        assertThat(factChecks.calls()).containsExactly(RecordingFactCheckService.QUESTION_ONLY, "99");
+        assertThat(factChecks.materialTexts()).containsExactly("健保署公告\n看到不要點");
         LINE.verify(postRequestedFor(urlEqualTo(REPLY))
-                .withRequestBody(matchingJsonPath("$.messages[0].text", equalTo(BotReplies.TOO_MANY_CANDIDATES))));
+                .withRequestBody(matchingJsonPath("$.messages[0].text", containing("「健保署公告 看到不要點」那則")))
+                .withRequestBody(matchingJsonPath("$.messages[0].text", containing("TEST RESULT 99"))));
+    }
+
+    @Test
+    void aLookBackTheModelStillCannotUseAsksToQuoteWithoutRetrying() throws Exception {
+        stubReplyOk("900");
+        factChecks.askForMaterialWhenAlone();
+        factChecks.behave(m -> {
+            throw new InvalidModelOutputException("asked for material that was already sent");
+        });
+        postWebhook(body(groupText("e1", "Cg1", "99", "轉傳的訊息")));
+        postWebhook(body(groupMention("e2", "Cg1", "100", "這是真的嗎", null)));
+
+        awaitSendState("100", SendState.REPLIED);
+        assertThat(jobFor("100").attempts()).isEqualTo(1);
+        LINE.verify(postRequestedFor(urlEqualTo(REPLY))
+                .withRequestBody(matchingJsonPath("$.messages[0].text", equalTo(BotReplies.ASK_TO_QUOTE))));
     }
 
     @Test

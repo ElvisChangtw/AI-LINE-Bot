@@ -1,5 +1,9 @@
 package com.elvischang.ailinebot.delivery;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+
 public final class BotReplies {
 
     public static final String QUOTE_NOT_FOUND =
@@ -10,7 +14,6 @@ public final class BotReplies {
     public static final String IMAGE_TOO_LARGE = "這張圖太大了（超過 10MB），請傳小一點的圖。";
     public static final String IMAGINE_NEEDS_PROMPT = "請在 /imagine 後面寫你想畫的內容，例如：/imagine 一隻戴帽子的貓";
     public static final String ASK_TO_QUOTE = "請「引用」你要查的那則訊息，再 @ 我。";
-    public static final String TOO_MANY_CANDIDATES = "最近有好幾則訊息，請「引用」你要查的那一則再 @ 我。";
     public static final String JOB_FAILED = "這題我卡住了，再問我一次好嗎？";
     public static final String QUOTA_EXCEEDED = "今天的額度被大家問光了，我先去充電，明天見 🔋";
     public static final String OUT_OF_CREDIT = "AskBot 沒電了，請叫 Elvis 加值 🔋";
@@ -18,6 +21,9 @@ public final class BotReplies {
             "這題我查不到可靠的資料，不敢亂回答。健康、用藥請問醫師或藥師；補助、法規可以打 1999 問；天氣可以看中央氣象署 App。";
     public static final String IMAGE_NOT_READY = "這張圖還在處理，請過一分鐘再問我一次";
     public static final String DELAYED_PREFIX = "（回覆剛才的問題）\n";
+    private static final int LOOKED_AT_SNIPPET = 12;
+    private static final DateTimeFormatter CLOCK =
+            DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.of("Asia/Taipei"));
     public static final String JOIN_NOTICE = """
             大家好，我是 AskBot。
             ・有問題可以直接 @ 我，我會上網查資料回答
@@ -31,5 +37,14 @@ public final class BotReplies {
     public static final String NOTHING_RELIABLE_FOUND = "目前查不到可靠的資料可以確認";
 
     private BotReplies() {
+    }
+
+    public static String lookedAt(long sentAt, String text) {
+        String snippet = text == null ? "圖片" : text.replaceAll("\\s+", " ").strip();
+        if (snippet.length() > LOOKED_AT_SNIPPET) {
+            snippet = snippet.substring(0, LOOKED_AT_SNIPPET) + "…";
+        }
+        return "（我看的是 " + CLOCK.format(Instant.ofEpochMilli(sentAt)) + "「" + snippet
+                + "」那則，猜錯了請「引用」再 @ 我）\n";
     }
 }

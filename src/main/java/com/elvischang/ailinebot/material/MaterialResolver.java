@@ -32,19 +32,16 @@ public class MaterialResolver {
                     .map(this::checkable)
                     .orElse(new Resolution.Notice(BotReplies.QUOTE_NOT_FOUND));
         }
-        // Attaching a recent message to an unrelated question would send a family member's words for no reason.
+        // The job looks back only if the model says the question is about a message it cannot see.
         if (!text.isBlank()) {
             return new Resolution.QuestionOnly();
         }
+        // A bare mention means "that message above"; the job picks which one once it runs.
         long since = now - props.recentWindow().toMillis();
-        List<Material> candidates = materials.recentCandidates(trigger.groupId(), since, trigger.messageId());
-        if (candidates.isEmpty()) {
+        if (materials.recentCandidates(trigger.groupId(), since, now, trigger.messageId()).isEmpty()) {
             return new Resolution.Notice(BotReplies.ASK_TO_QUOTE);
         }
-        if (candidates.size() > 1) {
-            return new Resolution.Notice(BotReplies.TOO_MANY_CANDIDATES);
-        }
-        return checkable(candidates.getFirst());
+        return new Resolution.QuestionOnly();
     }
 
     private Resolution checkable(Material material) {

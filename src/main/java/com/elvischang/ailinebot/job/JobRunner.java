@@ -5,11 +5,15 @@ import com.elvischang.ailinebot.delivery.BotReplies;
 import com.elvischang.ailinebot.delivery.ReplySender;
 import com.elvischang.ailinebot.factcheck.FactCheckReply;
 import com.elvischang.ailinebot.factcheck.FactCheckService;
+import com.elvischang.ailinebot.factcheck.InvalidModelOutputException;
+import com.elvischang.ailinebot.factcheck.ReplyMode;
 import com.elvischang.ailinebot.line.Hashes;
+import com.elvischang.ailinebot.material.RecentMaterialPicker;
 import com.elvischang.ailinebot.service.ImageGenerationService;
 import com.elvischang.ailinebot.store.Job;
 import com.elvischang.ailinebot.store.JobRepository;
 import com.elvischang.ailinebot.store.Material;
+import com.elvischang.ailinebot.store.MaterialKind;
 import com.elvischang.ailinebot.store.MaterialRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,17 +29,19 @@ public class JobRunner {
 
     private final JobRepository jobs;
     private final MaterialRepository materials;
+    private final RecentMaterialPicker picker;
     private final FactCheckService factCheckService;
     private final ImageGenerationService imageGenerationService;
     private final ReplySender replySender;
     private final BotProperties props;
     private final Clock clock;
 
-    public JobRunner(JobRepository jobs, MaterialRepository materials, FactCheckService factCheckService,
+    public JobRunner(JobRepository jobs, MaterialRepository materials, RecentMaterialPicker picker, FactCheckService factCheckService,
                      ImageGenerationService imageGenerationService, ReplySender replySender,
                      BotProperties props, Clock clock) {
         this.jobs = jobs;
         this.materials = materials;
+        this.picker = picker;
         this.factCheckService = factCheckService;
         this.imageGenerationService = imageGenerationService;
         this.replySender = replySender;
@@ -84,15 +90,44 @@ public class JobRunner {
     }
 
     private String factCheck(Job job) {
-        Material material = null;
         if (job.materialMessageId() != null) {
             Optional<Material> found = materials.find(job.groupId(), job.materialMessageId());
             if (found.isEmpty()) {
                 return BotReplies.QUOTE_NOT_FOUND;
             }
-            material = found.get();
+            return recorded(job, factCheckService.verify(job.groupId(), found.get(), job.userQuestion()));
         }
-        FactCheckReply reply = factCheckService.verify(job.groupId(), material, job.userQuestion());
+        String question = job.userQuestion() == null ? "" : job.userQuestion();
+        FactCheckReply firstPass = null;
+        if (!question.isBlank()) {
+            firstPass = factCheckService.verify(job.groupId(), null, question);
+            if (firstPass.mode() != ReplyMode.NEED_MATERIAL) {
+                return recorded(job, firstPass);
+            }
+        }
+        Optional<Material> picked = picker.pick(job.groupId(), job.triggerMessageId(), job.createdAt());
+        if (picked.isEmpty()) {
+            return firstPass == null ? BotReplies.ASK_TO_QUOTE : recorded(job, firstPass);
+        }
+        return lookedBack(job, picked.get(), question);
+    }
+
+    private String lookedBack(Job job, Material material, String question) {
+        if (material.kind() == MaterialKind.AUDIO || material.kind() == MaterialKind.VIDEO) {
+            return BotReplies.MEDIA_UNSUPPORTED;
+        }
+        FactCheckReply reply;
+        try {
+            reply = factCheckService.verify(job.groupId(), material, question);
+        } catch (InvalidModelOutputException e) {
+            // We guessed the message; if the model still cannot use it, asking beats retrying the guess.
+            log.info("look-back unusable jobId={} cause={}", job.id(), e.getMessage());
+            return BotReplies.ASK_TO_QUOTE;
+        }
+        return BotReplies.lookedAt(material.createdAt(), material.text()) + recorded(job, reply);
+    }
+
+    private String recorded(Job job, FactCheckReply reply) {
         if (reply.text() == null || reply.text().isBlank()) {
             throw new IllegalStateException("fact check produced no reply");
         }

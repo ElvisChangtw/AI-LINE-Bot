@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.util.OptionalInt;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 class MaterialRepositoryTest extends IntegrationTestSupport {
 
@@ -34,14 +35,15 @@ class MaterialRepositoryTest extends IntegrationTestSupport {
     @Test
     void recentCandidatesExcludeTriggersBotRepliesOldAndOtherGroups() {
         materials.insert(text("Cg1", "old", 10, false));
-        materials.insert(text("Cg1", "a", 100, false));
+        materials.insert(text("Cg1", "a", 100, false), "h1");
         materials.insert(text("Cg1", "trigger", 110, true));
         materials.insert(new Material("Cg1", "bot", MaterialKind.BOT_REPLY, null, false, MediaStatus.NONE, null, 0, 120, 999));
         materials.insert(text("Cg2", "other", 130, false));
         materials.insert(text("Cg1", "self", 140, false));
+        materials.insert(text("Cg1", "afterTheTrigger", 200, false));
 
-        assertThat(materials.recentCandidates("Cg1", 50, "self"))
-                .extracting(Material::messageId).containsExactly("a");
+        assertThat(materials.recentCandidates("Cg1", 50, 150, "self"))
+                .extracting(r -> r.material().messageId(), RecentMessage::senderHash).containsExactly(tuple("a", "h1"));
     }
 
     @Test
@@ -49,8 +51,8 @@ class MaterialRepositoryTest extends IntegrationTestSupport {
         for (int i = 0; i < 6; i++) {
             materials.insert(text("Cg1", "c" + i, 100 + i, false));
         }
-        assertThat(materials.recentCandidates("Cg1", 0, "none"))
-                .extracting(Material::messageId).containsExactly("c5", "c4", "c3", "c2", "c1");
+        assertThat(materials.recentCandidates("Cg1", 0, Long.MAX_VALUE, "none"))
+                .extracting(r -> r.material().messageId()).containsExactly("c5", "c4", "c3", "c2", "c1");
     }
 
     @Test

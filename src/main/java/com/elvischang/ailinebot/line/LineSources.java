@@ -20,4 +20,14 @@ public final class LineSources {
         }
         return Optional.empty();
     }
+
+    public static Optional<String> senderId(Source source) {
+        if (source instanceof GroupSource group) {
+            return Optional.ofNullable(group.userId());
+        }
+        if (source instanceof RoomSource room) {
+            return Optional.ofNullable(room.userId());
+        }
+        return Optional.empty();
+    }
 }

@@ -30,12 +30,17 @@ public class MaterialRepository {
     }
 
     public void insert(Material m) {
+        insert(m, null);
+    }
+
+    public void insert(Material m, String senderHash) {
         jdbc.sql("""
                         INSERT OR IGNORE INTO material(group_id, message_id, kind, text, is_bot_trigger, media_status,
-                                                       media_sha256, media_attempts, created_at, expires_at)
+                                                       media_sha256, media_attempts, created_at, expires_at, sender_hash)
                         VALUES (:groupId, :messageId, :kind, :text, :botTrigger, :mediaStatus,
-                                :sha, :attempts, :createdAt, :expiresAt)
+                                :sha, :attempts, :createdAt, :expiresAt, :sender)
                         """)
+                .param("sender", senderHash)
                 .param("groupId", m.groupId())
                 .param("messageId", m.messageId())
                 .param("kind", m.kind().name())
@@ -71,18 +76,19 @@ public class MaterialRepository {
                 .list();
     }
 
-    public List<Material> recentCandidates(String groupId, long since, String excludeMessageId) {
+    public List<RecentMessage> recentCandidates(String groupId, long since, long until, String excludeMessageId) {
         return jdbc.sql("""
                         SELECT * FROM material
-                        WHERE group_id = :g AND created_at >= :since AND message_id <> :exclude
+                        WHERE group_id = :g AND created_at >= :since AND created_at <= :until AND message_id <> :exclude
                           AND is_bot_trigger = 0 AND kind <> 'BOT_REPLY'
                         ORDER BY created_at DESC
                         LIMIT 5
                         """)
                 .param("g", groupId)
                 .param("since", since)
+                .param("until", until)
                 .param("exclude", excludeMessageId)
-                .query(MAPPER)
+                .query((rs, n) -> new RecentMessage(MAPPER.mapRow(rs, n), rs.getString("sender_hash")))
                 .list();
     }
 

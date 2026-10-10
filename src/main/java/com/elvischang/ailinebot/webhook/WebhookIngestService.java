@@ -88,12 +88,13 @@ public class WebhookIngestService {
             return;
         }
         String chatId = chat.get();
+        String sender = LineSources.senderId(event.source()).map(Hashes::shortHash).orElse(null);
         String jobId = null;
         switch (event.message()) {
-            case TextMessageContent text -> jobId = ingestText(chatId, text, event.replyToken(), now);
-            case ImageMessageContent image -> storeMedia(chatId, image.id(), MaterialKind.IMAGE, now);
-            case AudioMessageContent audio -> storeMedia(chatId, audio.id(), MaterialKind.AUDIO, now);
-            case VideoMessageContent video -> storeMedia(chatId, video.id(), MaterialKind.VIDEO, now);
+            case TextMessageContent text -> jobId = ingestText(chatId, text, event.replyToken(), sender, now);
+            case ImageMessageContent image -> storeMedia(chatId, image.id(), MaterialKind.IMAGE, sender, now);
+            case AudioMessageContent audio -> storeMedia(chatId, audio.id(), MaterialKind.AUDIO, sender, now);
+            case VideoMessageContent video -> storeMedia(chatId, video.id(), MaterialKind.VIDEO, sender, now);
             default -> {
             }
         }
@@ -143,11 +144,11 @@ public class WebhookIngestService {
         return inboundEvents.insertIfAbsent(webhookEventId, now, redelivery);
     }
 
-    private String ingestText(String chatId, TextMessageContent text, String replyToken, long now) {
+    private String ingestText(String chatId, TextMessageContent text, String replyToken, String sender, long now) {
         boolean mentioned = Mentions.mentionsBot(text);
         String body = mentioned ? Mentions.stripBotMentions(text) : text.text();
         materials.insert(new Material(chatId, text.id(), MaterialKind.TEXT, body, mentioned,
-                MediaStatus.NONE, null, 0, now, expiry(now)));
+                MediaStatus.NONE, null, 0, now, expiry(now)), sender);
         if (!mentioned) {
             return null;
         }
@@ -168,9 +169,9 @@ public class WebhookIngestService {
         };
     }
 
-    private void storeMedia(String chatId, String messageId, MaterialKind kind, long now) {
+    private void storeMedia(String chatId, String messageId, MaterialKind kind, String sender, long now) {
         MediaStatus status = kind == MaterialKind.IMAGE ? MediaStatus.PENDING : MediaStatus.NONE;
-        materials.insert(new Material(chatId, messageId, kind, null, false, status, null, 0, now, expiry(now)));
+        materials.insert(new Material(chatId, messageId, kind, null, false, status, null, 0, now, expiry(now)), sender);
         if (kind == MaterialKind.IMAGE) {
             publisher.publishEvent(new ImageReceivedEvent(chatId, messageId));
         }
