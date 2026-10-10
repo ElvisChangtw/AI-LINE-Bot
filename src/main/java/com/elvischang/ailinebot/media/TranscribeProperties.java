@@ -11,5 +11,7 @@ public record TranscribeProperties(
         Duration maxDuration,
         long maxBytes,
         long maxPreviewBytes,
-        Duration requestTimeout) {
+        Duration requestTimeout,
+        String ffmpegPath,
+        Duration frameTimeout) {
 }

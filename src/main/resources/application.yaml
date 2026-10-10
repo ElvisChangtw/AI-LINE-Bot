@@ -61,6 +61,8 @@ transcribe:
   max-bytes: 26214400
   max-preview-bytes: 2097152
   request-timeout: 120s
+  ffmpeg-path: ffmpeg
+  frame-timeout: 60s
 management:
   endpoints:
     web:
@@ -79,4 +81,4 @@ factcheck:
   daily-limit-micro-usd: 2000000
   monthly-limit-micro-usd: 10000000
   cache-ttl: 24h
-  prompt-version: v7
+  prompt-version: v8

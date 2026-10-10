@@ -64,6 +64,7 @@ public class MediaTranscriber {
     private final MessagingApiBlobClient blobClient;
     private final MediaStore mediaStore;
     private final AudioTranscriber transcriber;
+    private final VideoFrames frames;
     private final UsageGuard usageGuard;
     private final TranscribeProperties props;
     private final Clock clock;
@@ -71,11 +72,13 @@ public class MediaTranscriber {
     private final ReentrantLock[] locks = new ReentrantLock[LOCK_STRIPES];
 
     public MediaTranscriber(MaterialRepository materials, MessagingApiBlobClient blobClient, MediaStore mediaStore,
-                            AudioTranscriber transcriber, UsageGuard usageGuard, TranscribeProperties props, Clock clock) {
+                            AudioTranscriber transcriber, VideoFrames frames, UsageGuard usageGuard,
+                            TranscribeProperties props, Clock clock) {
         this.materials = materials;
         this.blobClient = blobClient;
         this.mediaStore = mediaStore;
         this.transcriber = transcriber;
+        this.frames = frames;
         this.usageGuard = usageGuard;
         this.props = props;
         this.clock = clock;
@@ -129,15 +132,17 @@ public class MediaTranscriber {
                 materials.markMedia(groupId, messageId, MediaStatus.TOO_LARGE, null);
                 return new Prepared.TooLong();
             }
-            String transcript;
             try {
-                transcript = transcriber.transcribe(file, expectedSeconds(media));
+                String transcript = transcriber.transcribe(file, expectedSeconds(media));
+                // Saved before anything else can fail, so a retry never pays for the same clip twice.
+                if (materials.saveTranscript(groupId, messageId, transcript, null) == 0) {
+                    return new Prepared.Gone();
+                }
+                if (media.kind() == MaterialKind.VIDEO && !storeFrames(groupId, messageId, file)) {
+                    storePreview(groupId, messageId);
+                }
             } finally {
                 Files.deleteIfExists(file);
-            }
-            // Saved before anything else can fail, so a retry never pays for the same clip twice.
-            if (materials.saveTranscript(groupId, messageId, transcript, null) == 0) {
-                return new Prepared.Gone();
             }
         } catch (ContentGone e) {
             log.info("media content gone groupHash={} messageId={}", Hashes.shortHash(groupId), messageId);
@@ -145,9 +150,6 @@ public class MediaTranscriber {
             return new Prepared.Gone();
         } catch (IOException e) {
             throw new IllegalStateException("media scratch file failed", e);
-        }
-        if (media.kind() == MaterialKind.VIDEO) {
-            storePreview(groupId, messageId);
         }
         return materials.find(groupId, messageId).<Prepared>map(this::ready).orElse(new Prepared.Gone());
     }
@@ -176,7 +178,33 @@ public class MediaTranscriber {
                 .orElse(props.maxDuration().toMillis()) / MILLIS_PER_SECOND;
     }
 
-    // The frame only helps; losing it must not undo or repeat the transcription.
+    // Frames only help; failing here must not undo or repeat the transcription.
+    private boolean storeFrames(String groupId, String messageId, Path video) {
+        long durationMs = materials.mediaDurationMs(groupId, messageId).orElse(0);
+        Optional<Path> sheet = frames.contactSheet(video, durationMs);
+        if (sheet.isEmpty()) {
+            return false;
+        }
+        try {
+            String sha = mediaStore.store(groupId, messageId, sheet.get(), props.maxPreviewBytes());
+            if (materials.markMedia(groupId, messageId, MediaStatus.STORED, sha) == 0) {
+                mediaStore.delete(groupId, messageId);
+            }
+            return true;
+        } catch (IOException | RuntimeException e) {
+            log.info("video frames not stored groupHash={} messageId={} cause={}",
+                    Hashes.shortHash(groupId), messageId, e.getClass().getSimpleName());
+            return false;
+        } finally {
+            try {
+                Files.deleteIfExists(sheet.get());
+            } catch (IOException e) {
+                log.info("video frames leftover cause={}", e.getClass().getSimpleName());
+            }
+        }
+    }
+
+    // LINE's single preview image, used only when frames could not be made.
     private void storePreview(String groupId, String messageId) {
         try {
             BlobContent preview = line(blobClient.getMessageContentPreview(messageId));

@@ -13,7 +13,7 @@ class OpenAiLiveSpikeTest {
 
     static FactCheckProperties liveProps(String model) {
         return new FactCheckProperties("https://api.openai.com/v1", System.getenv("OPENAI_API_KEY"), model, "medium", 3,
-                Duration.ofSeconds(40), 100_000, 500_000, 10_000, 2_000_000, 40_000_000, Duration.ofHours(24), "v7");
+                Duration.ofSeconds(40), 100_000, 500_000, 10_000, 2_000_000, 40_000_000, Duration.ofHours(24), "v8");
     }
 
     @Test
@@ -40,7 +40,7 @@ class OpenAiLiveSpikeTest {
     void transcribesARealVoiceClip() throws Exception {
         com.elvischang.ailinebot.media.AudioTranscriber transcriber = new com.elvischang.ailinebot.media.AudioTranscriber(
                 new com.elvischang.ailinebot.media.TranscribeProperties("gpt-transcribe", 4500, Duration.ofMinutes(5),
-                        26_214_400, 2_097_152, Duration.ofSeconds(120)),
+                        26_214_400, 2_097_152, Duration.ofSeconds(120), "ffmpeg", Duration.ofSeconds(60)),
                 liveProps("gpt-6-luna"), org.mockito.Mockito.mock(SpendRepository.class), java.time.Clock.systemUTC());
 
         String text = transcriber.transcribe(java.nio.file.Path.of(
@@ -48,5 +48,25 @@ class OpenAiLiveSpikeTest {
 
         System.out.println("transcript=" + text);
         assertThat(text).contains("健保卡");
+    }
+
+    @Test
+    void readsCaptionsFromVideoFrames() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("frames");
+        java.nio.file.Path video = dir.resolve("caption.mp4");
+        java.nio.file.Files.copy(java.nio.file.Path.of(getClass().getResource("/video/caption.mp4").toURI()), video);
+        com.elvischang.ailinebot.media.VideoFrames frames = new com.elvischang.ailinebot.media.VideoFrames(
+                new com.elvischang.ailinebot.media.TranscribeProperties("gpt-transcribe", 4500, Duration.ofMinutes(5),
+                        26_214_400, 2_097_152, Duration.ofSeconds(120), "ffmpeg", Duration.ofSeconds(60)));
+        byte[] sheet = java.nio.file.Files.readAllBytes(frames.contactSheet(video, 12_000).orElseThrow());
+        FactCheckProperties props = liveProps("gpt-6-luna");
+        OpenAiResponsesFactChecker checker = new OpenAiResponsesFactChecker(props, new FactCheckPrompt(props),
+                org.mockito.Mockito.mock(SpendRepository.class), java.time.Clock.systemUTC());
+
+        ModelCheck check = checker.check(new FactCheckInput(DefaultFactCheckService.VIDEO_FRAME_ONLY_LABEL, sheet, "image/jpeg",
+                "", LocalDate.now()));
+
+        System.out.println("video verdict=" + check.result().overall() + " headline=" + check.result().headline());
+        assertThat(check.result().overall()).isEqualTo(Verdict.INCORRECT);
     }
 }

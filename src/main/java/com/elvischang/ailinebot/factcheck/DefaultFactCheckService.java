@@ -37,9 +37,9 @@ public class DefaultFactCheckService implements FactCheckService {
     private static final Pattern LINK = Pattern.compile("https?://[^\\s<>\"'）)」]+", Pattern.CASE_INSENSITIVE);
     // Speech-to-text may mishear and often comes back in simplified characters; the prompt explains both.
     static final String VOICE_LABEL = "（語音訊息轉成的文字）\n";
-    static final String VIDEO_LABEL = "（影片的語音轉成的文字，圖片是影片的一個畫面）\n";
+    static final String VIDEO_LABEL = "（影片的語音轉成的文字，圖片是影片裡的畫面，通常是從頭到尾平均取的 6 個畫面拼成一張）\n";
     static final String VIDEO_NO_FRAME_LABEL = "（影片的語音轉成的文字）\n";
-    static final String VIDEO_FRAME_ONLY_LABEL = "（影片裡沒有聽到說話，下面只附影片的一個畫面）\n";
+    static final String VIDEO_FRAME_ONLY_LABEL = "（影片裡沒有聽到說話，只附影片裡的畫面，通常是從頭到尾平均取的 6 個畫面拼成一張）\n";
     private static final Pattern SCHEME_AND_WWW = Pattern.compile("^(https?://)?(www\\.)?", Pattern.CASE_INSENSITIVE);
     private static final Pattern WHITESPACE = Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS);
 

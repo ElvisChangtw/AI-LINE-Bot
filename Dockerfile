@@ -6,7 +6,7 @@ RUN mvn -B -q package -DskipTests
 
 FROM eclipse-temurin:21.0.12.1_1-jre-noble
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 10001 app \
     && useradd --system --uid 10001 --gid app --no-create-home app \

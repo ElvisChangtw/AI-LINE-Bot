@@ -152,10 +152,30 @@ class MediaTranscriberTest extends IntegrationTestSupport {
     @Test
     void aClipTooBigToSendIsTooLongNotSilent() {
         Material video = put("360", MaterialKind.VIDEO, MediaStatus.NONE);
-        stubContent("360", "succeeded", "video/mp4", new byte[100]);
+        stubContent("360", "succeeded", "video/mp4", new byte[40_000]);
 
         assertThat(transcriber.prepare(video)).isEqualTo(new MediaTranscriber.Prepared.TooLong());
         assertThat(materials.find("Cg1", "360").orElseThrow().mediaStatus()).isEqualTo(MediaStatus.TOO_LARGE);
         LINE.verify(0, postRequestedFor(urlEqualTo(TRANSCRIBE)));
+    }
+
+    @Test
+    void aRealVideoKeepsFramesFromTheWholeClipInsteadOfLinesPreview() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                new ProcessBuilder("ffmpeg", "-version").start().waitFor() == 0, "ffmpeg not installed");
+        Material video = put("370", MaterialKind.VIDEO, MediaStatus.NONE);
+        byte[] clip = java.nio.file.Files.readAllBytes(java.nio.file.Path.of(getClass().getResource("/video/tiny.mp4").toURI()));
+        LINE.stubFor(get(urlEqualTo("/v2/bot/message/370/content/transcoding")).willReturn(okJson("{\"status\":\"succeeded\"}")));
+        LINE.stubFor(get(urlEqualTo("/v2/bot/message/370/content"))
+                .willReturn(aResponse().withHeader("Content-Type", "video/mp4").withBody(clip)));
+        stubTranscript("嗶");
+
+        assertThat(transcriber.prepare(video)).isInstanceOf(MediaTranscriber.Prepared.Ready.class);
+
+        byte[] stored = java.nio.file.Files.readAllBytes(mediaStore.storedFile("Cg1", "370").orElseThrow());
+        assertThat(stored[0]).isEqualTo((byte) 0xFF);
+        assertThat(stored.length).isGreaterThan(1_000);
+        LINE.verify(0, com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor(urlEqualTo("/v2/bot/message/370/content/preview")));
+        assertThat(java.nio.file.Files.list(mediaStore.scratchDir()).toList()).isEmpty();
     }
 }

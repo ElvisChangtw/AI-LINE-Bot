@@ -62,7 +62,7 @@ public class MediaStore {
                 future.cancel(true);
                 throw e;
             }
-            String sha256 = writeLimited(content, target, props.mediaMaxBytes());
+            String sha256 = writeLimited(content.byteStream(), target, props.mediaMaxBytes());
             if (materials.markMedia(groupId, messageId, MediaStatus.STORED, sha256) == 0) {
                 delete(groupId, messageId);
                 log.info("media discarded after material removal groupHash={} messageId={}",
@@ -121,7 +121,11 @@ public class MediaStore {
 
     // Writes LINE content to the media file for this message; throws MediaTooLargeException past the cap.
     public String store(String groupId, String messageId, BlobContent content, long maxBytes) throws IOException {
-        return writeLimited(content, pathFor(groupId, messageId), maxBytes);
+        return writeLimited(content.byteStream(), pathFor(groupId, messageId), maxBytes);
+    }
+
+    public String store(String groupId, String messageId, Path source, long maxBytes) throws IOException {
+        return writeLimited(Files.newInputStream(source), pathFor(groupId, messageId), maxBytes);
     }
 
     public Path scratchDir() {
@@ -142,10 +146,10 @@ public class MediaStore {
         }
     }
 
-    private String writeLimited(BlobContent content, Path target, long maxBytes) throws IOException {
+    private String writeLimited(InputStream source, Path target, long maxBytes) throws IOException {
         Files.createDirectories(target.getParent());
         Path temp = Files.createTempFile(target.getParent(), "download-", ".part");
-        try (InputStream in = content.byteStream();
+        try (InputStream in = source;
              DigestOutputStream out = new DigestOutputStream(Files.newOutputStream(temp), sha256())) {
             long total = copyLimited(in, out, maxBytes);
             if (total == 0) {
