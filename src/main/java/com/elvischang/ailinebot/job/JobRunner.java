@@ -84,15 +84,19 @@ public class JobRunner {
     }
 
     private String factCheck(Job job) {
-        Optional<Material> material = materials.find(job.groupId(), job.materialMessageId());
-        if (material.isEmpty()) {
-            return BotReplies.QUOTE_NOT_FOUND;
+        Material material = null;
+        if (job.materialMessageId() != null) {
+            Optional<Material> found = materials.find(job.groupId(), job.materialMessageId());
+            if (found.isEmpty()) {
+                return BotReplies.QUOTE_NOT_FOUND;
+            }
+            material = found.get();
         }
-        FactCheckReply reply = factCheckService.verify(material.get(), job.userQuestion());
+        FactCheckReply reply = factCheckService.verify(job.groupId(), material, job.userQuestion());
         if (reply.text() == null || reply.text().isBlank()) {
             throw new IllegalStateException("fact check produced no reply");
         }
-        jobs.recordFactCheck(job.id(), job.attempts(), reply.verdict(), reply.usage(), reply.costMicroUsd());
+        jobs.recordFactCheck(job.id(), job.attempts(), reply.verdict(), reply.mode(), reply.usage(), reply.costMicroUsd());
         return reply.text();
     }
 

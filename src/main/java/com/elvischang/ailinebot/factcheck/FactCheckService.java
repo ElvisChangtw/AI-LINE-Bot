@@ -4,5 +4,6 @@ import com.elvischang.ailinebot.store.Material;
 
 public interface FactCheckService {
 
-    FactCheckReply verify(Material material, String userQuestion);
+    // material is null when the question was asked without quoting anything.
+    FactCheckReply verify(String groupId, Material material, String userQuestion);
 }

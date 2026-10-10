@@ -10,19 +10,21 @@ import java.util.function.Function;
 
 public class RecordingFactCheckService implements FactCheckService {
 
+    public static final String QUESTION_ONLY = "question";
+
     private final List<String> calls = new CopyOnWriteArrayList<>();
     private volatile Function<Material, String> behavior = RecordingFactCheckService::defaultResult;
     private volatile FactCheckService delegate;
 
     private static String defaultResult(Material material) {
-        return "TEST RESULT " + material.messageId();
+        return "TEST RESULT " + (material == null ? QUESTION_ONLY : material.messageId());
     }
 
     @Override
-    public FactCheckReply verify(Material material, String userQuestion) {
-        calls.add(material.messageId());
+    public FactCheckReply verify(String groupId, Material material, String userQuestion) {
+        calls.add(material == null ? QUESTION_ONLY : material.messageId());
         FactCheckService real = delegate;
-        return real != null ? real.verify(material, userQuestion) : FactCheckReply.notice(behavior.apply(material));
+        return real != null ? real.verify(groupId, material, userQuestion) : FactCheckReply.notice(behavior.apply(material));
     }
 
     public List<String> calls() {

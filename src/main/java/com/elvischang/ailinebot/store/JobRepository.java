@@ -1,5 +1,6 @@
 package com.elvischang.ailinebot.store;
 
+import com.elvischang.ailinebot.factcheck.ReplyMode;
 import com.elvischang.ailinebot.factcheck.Usage;
 import com.elvischang.ailinebot.factcheck.Verdict;
 import org.springframework.jdbc.core.RowMapper;
@@ -255,13 +256,14 @@ public class JobRepository {
                 .update();
     }
 
-    public void recordFactCheck(String id, int attempt, Verdict verdict, Usage usage, long costMicroUsd) {
+    public void recordFactCheck(String id, int attempt, Verdict verdict, ReplyMode mode, Usage usage, long costMicroUsd) {
         jdbc.sql("""
-                        UPDATE job SET verdict = :verdict, input_tokens = :in, output_tokens = :out,
+                        UPDATE job SET verdict = :verdict, mode = :mode, input_tokens = :in, output_tokens = :out,
                                        search_calls = :searches, cost_micro_usd = COALESCE(cost_micro_usd, 0) + :cost
                         WHERE id = :id AND status = 'RUNNING' AND attempts = :attempt
                         """)
                 .param("verdict", verdict == null ? null : verdict.name())
+                .param("mode", mode == null ? null : mode.name())
                 .param("in", usage.inputTokens())
                 .param("out", usage.outputTokens())
                 .param("searches", usage.searchCalls())

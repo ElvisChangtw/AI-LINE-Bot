@@ -47,7 +47,10 @@ public class DefaultFactCheckService implements FactCheckService {
     }
 
     @Override
-    public FactCheckReply verify(Material material, String userQuestion) {
+    public FactCheckReply verify(String groupId, Material material, String userQuestion) {
+        if (material == null) {
+            return check(groupId, null, null, null, userQuestion);
+        }
         if (material.kind() == MaterialKind.IMAGE && material.mediaStatus() != MediaStatus.STORED) {
             return FactCheckReply.notice(material.mediaStatus() == MediaStatus.PENDING
                     ? BotReplies.IMAGE_NOT_READY : BotReplies.IMAGE_GONE);
@@ -61,29 +64,38 @@ public class DefaultFactCheckService implements FactCheckService {
         if (material.kind() == MaterialKind.IMAGE && image == null) {
             return FactCheckReply.notice(BotReplies.IMAGE_GONE);
         }
+        return check(groupId, text, image, material.mediaSha256(), userQuestion);
+    }
+
+    private FactCheckReply check(String groupId, String text, byte[] image, String imageSha256, String userQuestion) {
         boolean hasLink = text != null && LINK.matcher(text).find();
         long now = clock.millis();
-        String key = cacheKey(text, material.mediaSha256());
+        String key = cacheKey(userQuestion, text, imageSha256);
 
         Optional<FactCheckResult> cached = cache.get(key, now);
         if (cached.isPresent()) {
-            logOutcome(material, true, cached.get().overall(), Usage.NONE, 0);
-            return new FactCheckReply(nonBlank(ReplyFormatter.format(cached.get(), hasLink)), cached.get().overall(), Usage.NONE, 0);
+            logOutcome(groupId, true, cached.get(), Usage.NONE, 0);
+            return reply(cached.get(), hasLink, Usage.NONE, 0);
         }
         if (!usageGuard.allows(now)) {
-            log.info("factcheck refused groupHash={} reason=budget", Hashes.shortHash(material.groupId()));
+            log.info("factcheck refused groupHash={} reason=budget", Hashes.shortHash(groupId));
             return FactCheckReply.notice(BotReplies.QUOTA_EXCEEDED);
         }
         ModelCheck check = checker.check(new FactCheckInput(text, image, image == null ? null : mimeType(image),
                 userQuestion, LocalDate.now(clock.withZone(TAIPEI))));
         FactCheckResult filtered = CitationFilter.apply(check.result(), check.consultedUrls());
-        // New rumours often get fact-checked hours later, so a "not enough evidence" answer must not stick.
-        if (filtered.overall() != Verdict.INSUFFICIENT_EVIDENCE) {
+        // Answers go stale (weather, news) and new rumours often get fact-checked hours later, so neither may stick.
+        if (filtered.mode() == ReplyMode.FACT_CHECK && filtered.overall() != Verdict.INSUFFICIENT_EVIDENCE) {
             cache.put(key, filtered, now);
         }
         long cost = check.usage().costMicroUsd(props);
-        logOutcome(material, false, filtered.overall(), check.usage(), cost);
-        return new FactCheckReply(nonBlank(ReplyFormatter.format(filtered, hasLink)), filtered.overall(), check.usage(), cost);
+        logOutcome(groupId, false, filtered, check.usage(), cost);
+        return reply(filtered, hasLink, check.usage(), cost);
+    }
+
+    private static FactCheckReply reply(FactCheckResult result, boolean hasLink, Usage usage, long cost) {
+        Verdict verdict = result.mode() == ReplyMode.FACT_CHECK ? result.overall() : null;
+        return new FactCheckReply(nonBlank(ReplyFormatter.format(result, hasLink)), verdict, result.mode(), usage, cost);
     }
 
     private byte[] readImage(Material material) {
@@ -98,11 +110,15 @@ public class DefaultFactCheckService implements FactCheckService {
         }
     }
 
-    private String cacheKey(String text, String imageSha256) {
-        String normalized = text == null ? "" : WHITESPACE.matcher(text).replaceAll(" ").trim();
-        String raw = props.promptVersion() + "\n" + props.model() + "\n" + normalized + "\n"
+    private String cacheKey(String question, String text, String imageSha256) {
+        String raw = props.promptVersion() + "\n" + props.model() + "\n" + normalized(question) + "\n" + normalized(text) + "\n"
                 + (imageSha256 == null ? "" : imageSha256);
         return Hashes.sha256Hex(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    // Collapsing whitespace also removes newlines, so the "\n"-joined key stays unambiguous.
+    private static String normalized(String value) {
+        return value == null ? "" : WHITESPACE.matcher(value).replaceAll(" ").trim();
     }
 
     static String mimeType(byte[] image) {
@@ -126,9 +142,9 @@ public class DefaultFactCheckService implements FactCheckService {
         return text;
     }
 
-    private void logOutcome(Material material, boolean cacheHit, Verdict verdict, Usage usage, long cost) {
-        log.info("factcheck groupHash={} cacheHit={} verdict={} inputTokens={} outputTokens={} searchCalls={} costMicroUsd={}",
-                Hashes.shortHash(material.groupId()), cacheHit, verdict, usage.inputTokens(), usage.outputTokens(),
-                usage.searchCalls(), cost);
+    private void logOutcome(String groupId, boolean cacheHit, FactCheckResult result, Usage usage, long cost) {
+        log.info("factcheck groupHash={} cacheHit={} mode={} verdict={} highRisk={} sources={} inputTokens={} outputTokens={} searchCalls={} costMicroUsd={}",
+                Hashes.shortHash(groupId), cacheHit, result.mode(), result.overall(), result.highRisk(), result.sources().size(),
+                usage.inputTokens(), usage.outputTokens(), usage.searchCalls(), cost);
     }
 }

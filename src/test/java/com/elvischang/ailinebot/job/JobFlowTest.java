@@ -7,6 +7,7 @@ import com.elvischang.ailinebot.store.JobRepository;
 import com.elvischang.ailinebot.store.JobStatus;
 import com.elvischang.ailinebot.store.SendState;
 import com.elvischang.ailinebot.support.IntegrationTestSupport;
+import com.elvischang.ailinebot.support.RecordingFactCheckService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -60,6 +61,18 @@ class JobFlowTest extends IntegrationTestSupport {
         LINE.verify(postRequestedFor(urlEqualTo(REPLY))
                 .withRequestBody(matchingJsonPath("$.replyToken", equalTo("rt-e2")))
                 .withRequestBody(matchingJsonPath("$.messages[0].text", equalTo("TEST RESULT 99"))));
+    }
+
+    @Test
+    void anUnquotedQuestionIsAnsweredWithoutMaterial() throws Exception {
+        stubReplyOk("900");
+        postWebhook(body(groupText("e1", "Cg1", "99", "家人剛傳的訊息")));
+        postWebhook(body(groupMention("e2", "Cg1", "100", "明天台北會下雨嗎", null)));
+
+        awaitSendState("100", SendState.REPLIED);
+        assertThat(factChecks.calls()).containsExactly(RecordingFactCheckService.QUESTION_ONLY);
+        LINE.verify(postRequestedFor(urlEqualTo(REPLY))
+                .withRequestBody(matchingJsonPath("$.messages[0].text", equalTo("TEST RESULT question"))));
     }
 
     @Test

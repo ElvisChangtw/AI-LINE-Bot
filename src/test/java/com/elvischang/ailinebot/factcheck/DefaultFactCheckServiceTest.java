@@ -57,6 +57,17 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
             List.of(new FactCheckResult.Source("https://tfc-taiwan.org.tw/?p=108215", "t", "台灣事實查核中心", ""),
                     new FactCheckResult.Source("https://example.com/made-up", "t", "假", "")));
 
+    private FactCheckReply ask(Material material, String question) {
+        return service.verify(material.groupId(), material, question);
+    }
+
+    private ModelCheck answer(ReplyMode mode) {
+        FactCheckResult result = new FactCheckResult(Verdict.NOT_APPLICABLE, false, "帶傘", List.of(), false,
+                List.of(new FactCheckResult.Source("https://www.cwa.gov.tw/a", "t", "中央氣象署", "")), mode, true,
+                mode == ReplyMode.ANSWER ? List.of("降雨機率 70%") : List.of());
+        return new ModelCheck(result, Set.of("https://www.cwa.gov.tw/a"), new Usage(1_000, 100, 1));
+    }
+
     private Material text(String group, String id, String body) {
         long now = clock.millis();
         Material m = new Material(group, id, MaterialKind.TEXT, body, false, MediaStatus.NONE, null, 0, now, now + 1_000_000);
@@ -68,14 +79,15 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
     void checksFiltersFormatsAndCaches() {
         when(checker.check(any())).thenReturn(new ModelCheck(RESULT, Set.of("https://tfc-taiwan.org.tw/?p=108215"), new Usage(20_000, 4_000, 3)));
 
-        FactCheckReply first = service.verify(text("Cg1", "1", "按1 手機被屏蔽 https://x.example"), "真的嗎");
-        FactCheckReply second = service.verify(text("Cg2", "2", "按1   手機被屏蔽 https://x.example"), "這是真的？");
+        FactCheckReply first = ask(text("Cg1", "1", "按1 手機被屏蔽 https://x.example"), "真的嗎");
+        FactCheckReply second = ask(text("Cg2", "2", "按1   手機被屏蔽 https://x.example"), " 真的嗎  ");
 
         assertThat(first.text()).startsWith("【查證結果】這是假消息，舊謠言")
                 .contains(BotReplies.LINK_NOT_OPENED)
                 .contains("https://tfc-taiwan.org.tw/?p=108215")
                 .doesNotContain("example.com/made-up");
         assertThat(first.verdict()).isEqualTo(Verdict.INCORRECT);
+        assertThat(first.mode()).isEqualTo(ReplyMode.FACT_CHECK);
         assertThat(first.costMicroUsd()).isEqualTo(2_000 + 2_000 + 30_000);
         assertThat(second.text()).isEqualTo(first.text());
         assertThat(second.costMicroUsd()).isZero();
@@ -110,10 +122,10 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
     void differentImagesAndATextMatchingAnImageShaNeverShareACacheEntry() throws Exception {
         answerWithResult();
 
-        service.verify(storedImage("401", "sha401"), "真的嗎");
-        service.verify(storedImage("402", "sha402"), "真的嗎");
-        service.verify(storedImage("403", "x"), "真的嗎");
-        service.verify(text("Cg1", "404", "x"), "真的嗎");
+        ask(storedImage("401", "sha401"), "真的嗎");
+        ask(storedImage("402", "sha402"), "真的嗎");
+        ask(storedImage("403", "x"), "真的嗎");
+        ask(text("Cg1", "404", "x"), "真的嗎");
 
         verify(checker, times(4)).check(any());
     }
@@ -127,8 +139,8 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
                 props.monthlyLimitMicroUsd(), props.cacheTtl(), props.promptVersion());
         DefaultFactCheckService otherService = new DefaultFactCheckService(checker, cache, usageGuard, mediaStore, otherModel, clock);
 
-        service.verify(text("Cg1", "1", "按1 手機被屏蔽"), "真的嗎");
-        otherService.verify(text("Cg2", "2", "按1 手機被屏蔽"), "真的嗎");
+        ask(text("Cg1", "1", "按1 手機被屏蔽"), "真的嗎");
+        otherService.verify("Cg2", text("Cg2", "2", "按1 手機被屏蔽"), "真的嗎");
 
         verify(checker, times(2)).check(any());
     }
@@ -137,8 +149,8 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
     void storedImageWithoutAHashIsTreatedAsGone() throws Exception {
         answerWithResult();
 
-        assertThat(service.verify(storedImage("405", null), "真的嗎").text()).isEqualTo(BotReplies.IMAGE_GONE);
-        assertThat(service.verify(storedImage("406", " "), "真的嗎").text()).isEqualTo(BotReplies.IMAGE_GONE);
+        assertThat(ask(storedImage("405", null), "真的嗎").text()).isEqualTo(BotReplies.IMAGE_GONE);
+        assertThat(ask(storedImage("406", " "), "真的嗎").text()).isEqualTo(BotReplies.IMAGE_GONE);
 
         verify(checker, never()).check(any());
     }
@@ -147,8 +159,8 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
     void insufficientEvidenceIsNotCached() {
         when(checker.check(any())).thenReturn(new ModelCheck(RESULT, Set.of(), Usage.NONE));
 
-        FactCheckReply first = service.verify(text("Cg1", "1", "剛出現的新謠言"), "真的嗎");
-        service.verify(text("Cg2", "2", "剛出現的新謠言"), "真的嗎");
+        FactCheckReply first = ask(text("Cg1", "1", "剛出現的新謠言"), "真的嗎");
+        ask(text("Cg2", "2", "剛出現的新謠言"), "真的嗎");
 
         assertThat(first.verdict()).isEqualTo(Verdict.INSUFFICIENT_EVIDENCE);
         verify(checker, times(2)).check(any());
@@ -159,7 +171,7 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
     void refusesWhenTheBudgetIsSpent() {
         spendRepository.record(clock.millis(), 2_000_000L);
 
-        FactCheckReply reply = service.verify(text("Cg1", "1", "內容"), "真的嗎");
+        FactCheckReply reply = ask(text("Cg1", "1", "內容"), "真的嗎");
 
         assertThat(reply.text()).isEqualTo(BotReplies.QUOTA_EXCEEDED);
         verify(checker, never()).check(any());
@@ -177,13 +189,54 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
         Files.createDirectories(file.getParent());
         Files.write(file, new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 1, 2});
 
-        assertThat(service.verify(pending, "真的嗎").text()).isEqualTo(BotReplies.IMAGE_NOT_READY);
-        service.verify(stored, "真的嗎");
+        assertThat(ask(pending, "真的嗎").text()).isEqualTo(BotReplies.IMAGE_NOT_READY);
+        ask(stored, "真的嗎");
 
         ArgumentCaptor<FactCheckInput> input = ArgumentCaptor.forClass(FactCheckInput.class);
         verify(checker).check(input.capture());
         assertThat(input.getValue().imageMimeType()).isEqualTo("image/png");
         assertThat(input.getValue().materialText()).isNull();
         Files.deleteIfExists(file);
+    }
+
+    @Test
+    void differentQuestionsAboutTheSameMaterialDoNotShareACacheEntry() {
+        answerWithResult();
+
+        ask(text("Cg1", "1", "按1 手機被屏蔽"), "真的嗎");
+        ask(text("Cg2", "2", "按1 手機被屏蔽"), "我要不要報警");
+
+        verify(checker, times(2)).check(any());
+    }
+
+    @Test
+    void aQuestionWithoutMaterialIsSentOnItsOwn() {
+        when(checker.check(any())).thenReturn(answer(ReplyMode.ANSWER));
+
+        FactCheckReply reply = service.verify("Cg1", null, "明天台北會下雨嗎");
+
+        ArgumentCaptor<FactCheckInput> input = ArgumentCaptor.forClass(FactCheckInput.class);
+        verify(checker).check(input.capture());
+        assertThat(input.getValue().materialText()).isNull();
+        assertThat(input.getValue().image()).isNull();
+        assertThat(input.getValue().userQuestion()).isEqualTo("明天台北會下雨嗎");
+        assertThat(reply.text()).startsWith("【回答】帶傘");
+        assertThat(reply.mode()).isEqualTo(ReplyMode.ANSWER);
+        assertThat(reply.verdict()).isNull();
+        assertThat(reply.costMicroUsd()).isEqualTo(100 + 50 + 10_000);
+    }
+
+    @Test
+    void answersAndRequestsForMaterialAreNeverCached() {
+        when(checker.check(any())).thenReturn(answer(ReplyMode.ANSWER), answer(ReplyMode.ANSWER),
+                answer(ReplyMode.NEED_MATERIAL), answer(ReplyMode.NEED_MATERIAL));
+
+        service.verify("Cg1", null, "明天台北會下雨嗎");
+        service.verify("Cg2", null, "明天台北會下雨嗎");
+        assertThat(service.verify("Cg1", null, "這是真的嗎").text()).isEqualTo(BotReplies.ASK_TO_QUOTE);
+        service.verify("Cg2", null, "這是真的嗎");
+
+        verify(checker, times(4)).check(any());
+        assertThat(jdbc.sql("SELECT COUNT(*) FROM verification_cache").query(Integer.class).single()).isZero();
     }
 }
