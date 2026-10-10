@@ -29,6 +29,8 @@ healthy() {
 # Start the app on its own and wait ourselves, so compose versions that wait on depends_on cannot hang the deploy.
 switch_to() {
   export APP_TAG="$1"
+  # compose reads this file for manual commands on the host (logs, stop, start).
+  printf 'ECR_REPO=%s\nAPP_TAG=%s\n' "$ECR_REPO" "$APP_TAG" > "$DIR/.env"
   compose up -d --no-deps app && healthy && compose up -d --no-deps --remove-orphans cloudflared
 }
 
