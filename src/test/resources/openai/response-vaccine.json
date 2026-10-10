@@ -15,7 +15,8 @@
         "query": "接到電話 按1 手機被屏蔽 疫苗",
         "sources": [
           { "type": "url", "url": "https://tfc-taiwan.org.tw/?p=108215&utm_source=line" },
-          { "type": "url", "url": "https://en.cofacts.tw/article/2xegenmqt9ehy" }
+          { "type": "url", "url": "https://en.cofacts.tw/article/2xegenmqt9ehy" },
+          { "type": "api", "name": "oai-weather" }
         ]
       }
     },

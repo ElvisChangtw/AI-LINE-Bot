@@ -174,7 +174,7 @@ public class OpenAiResponsesFactChecker implements FactChecker {
             return List.of();
         }
         return action.asSearch().sources().orElse(List.of()).stream()
-                .map(ResponseFunctionWebSearch.Action.Search.Source::url)
+                .flatMap(source -> source._url().asString().stream())
                 .toList();
     }
 
