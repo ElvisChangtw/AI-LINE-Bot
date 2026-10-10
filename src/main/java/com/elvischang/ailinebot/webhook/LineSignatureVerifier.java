@@ -12,6 +12,9 @@ public class LineSignatureVerifier {
     private final LineSignatureValidator validator;
 
     public LineSignatureVerifier(@Value("${line.bot.channel-secret}") String channelSecret) {
+        if (channelSecret == null || channelSecret.isBlank()) {
+            throw new IllegalStateException("line.bot.channel-secret is blank");
+        }
         this.validator = new LineSignatureValidator(channelSecret.getBytes(StandardCharsets.UTF_8));
     }
 

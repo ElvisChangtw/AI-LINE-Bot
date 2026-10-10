@@ -19,4 +19,10 @@ public record FactCheckProperties(
         long monthlyLimitMicroUsd,
         Duration cacheTtl,
         String promptVersion) {
+
+    public FactCheckProperties {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException("factcheck.api-key is blank");
+        }
+    }
 }

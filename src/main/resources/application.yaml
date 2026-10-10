@@ -27,10 +27,6 @@ spring:
       http:
         connect-timeout: 100s
         read-timeout: 120s
-      chat:
-        options:
-          model: ${OPEN_AI_MODEL}
-          temperature: ${OPEN_AI_TEMPERATURE}
       image:
         options:
           model: dall-e-3

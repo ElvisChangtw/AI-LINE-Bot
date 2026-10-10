@@ -41,6 +41,9 @@ public class LineReplyClient {
     public LineReplyClient(@Value("${line.bot.api-end-point:https://api.line.me/}") URI apiEndPoint,
                            @Value("${line.bot.channel-token}") String channelToken,
                            BotProperties props) {
+        if (channelToken == null || channelToken.isBlank()) {
+            throw new IllegalStateException("line.bot.channel-token is blank");
+        }
         this.replyUri = apiEndPoint.resolve("v2/bot/message/reply");
         this.channelToken = channelToken;
         this.props = props;
