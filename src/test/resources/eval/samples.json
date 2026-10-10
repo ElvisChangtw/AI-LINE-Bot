@@ -254,5 +254,11 @@
     "text": "（這是 AskBot 之前在群組的回覆，家人在追問它）\n這是假消息，健保卡停卡連結是詐騙警訊\n・健保署已提醒，這類要求點不明連結的 LINE 訊息是詐騙，請勿點選。\n來源：衛生福利部中央健康保險署（2026-08-13）\nhttps://www.nhi.gov.tw/ch/cp-20350-3012a-3255-1.html",
     "question": "那為何你還說是假消息",
     "expected_mode": "ANSWER"
+  },
+  {
+    "id": "g18",
+    "category": "voice",
+    "text": "（語音訊息轉成的文字）\n健保卡要停用了，请点连结更新资料，不然下个月就不能看病。",
+    "expected": "INCORRECT"
   }
 ]

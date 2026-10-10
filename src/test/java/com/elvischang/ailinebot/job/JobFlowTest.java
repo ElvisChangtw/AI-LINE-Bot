@@ -18,9 +18,13 @@ import java.time.Duration;
 
 import static com.elvischang.ailinebot.support.Webhooks.body;
 import static com.elvischang.ailinebot.support.Webhooks.groupMention;
+import static com.elvischang.ailinebot.support.Webhooks.groupAudio;
 import static com.elvischang.ailinebot.support.Webhooks.groupText;
+import static com.elvischang.ailinebot.support.Webhooks.groupVideo;
 import static com.elvischang.ailinebot.support.Webhooks.groupTextFrom;
 import static com.github.tomakehurst.wiremock.client.WireMock.containing;
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
@@ -129,6 +133,34 @@ class JobFlowTest extends IntegrationTestSupport {
         assertThat(factChecks.calls()).containsExactly("99", "900", RecordingFactCheckService.QUESTION_ONLY, "900");
         assertThat(factChecks.materialTexts()).containsExactly("轉傳的訊息",
                 RecentMaterialPicker.EARLIER_BOT_REPLY + "TEST RESULT 99", RecentMaterialPicker.EARLIER_BOT_REPLY + "TEST RESULT 99");
+    }
+
+    @Test
+    void aQuotedVoiceMessageIsTranscribedThenChecked() throws Exception {
+        stubReplyOk("900");
+        LINE.stubFor(get(urlEqualTo("/v2/bot/message/99/content/transcoding")).willReturn(okJson("{\"status\":\"succeeded\"}")));
+        LINE.stubFor(get(urlEqualTo("/v2/bot/message/99/content"))
+                .willReturn(aResponse().withHeader("Content-Type", "audio/x-m4a").withBody(new byte[] {1, 2})));
+        LINE.stubFor(post(urlEqualTo("/v1/audio/transcriptions"))
+                .willReturn(okJson("{\"text\":\"健保卡要停用了\",\"usage\":{\"type\":\"duration\",\"seconds\":1}}")));
+        postWebhook(body(groupAudio("e1", "Cg1", "99")));
+        postWebhook(body(groupMention("e2", "Cg1", "100", "這是真的嗎", "99")));
+
+        awaitSendState("100", SendState.REPLIED);
+        assertThat(factChecks.calls()).containsExactly("99");
+        assertThat(factChecks.materialTexts()).containsExactly("健保卡要停用了");
+    }
+
+    @Test
+    void aVideoLongerThanFiveMinutesIsDeclinedWithoutDownloading() throws Exception {
+        stubReplyOk("900");
+        postWebhook(body(groupVideo("e1", "Cg1", "99", 6 * 60_000L)));
+        postWebhook(body(groupMention("e2", "Cg1", "100", "這是真的嗎", "99")));
+
+        awaitSendState("100", SendState.REPLIED);
+        assertThat(factChecks.calls()).isEmpty();
+        LINE.verify(postRequestedFor(urlEqualTo(REPLY))
+                .withRequestBody(matchingJsonPath("$.messages[0].text", equalTo(BotReplies.MEDIA_TOO_LONG))));
     }
 
     @Test

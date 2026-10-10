@@ -66,6 +66,12 @@ public final class Webhooks {
                         .formatted(messageId, messageId));
     }
 
+    public static String groupVideo(String eventId, String groupId, String messageId, long durationMs) {
+        return messageEvent(eventId, group(groupId),
+                "{\"type\":\"video\",\"id\":\"%s\",\"duration\":%d,\"contentProvider\":{\"type\":\"line\"}}"
+                        .formatted(messageId, durationMs));
+    }
+
     public static String groupAudio(String eventId, String groupId, String messageId) {
         return messageEvent(eventId, group(groupId),
                 "{\"type\":\"audio\",\"id\":\"%s\",\"duration\":1000,\"contentProvider\":{\"type\":\"line\"}}"

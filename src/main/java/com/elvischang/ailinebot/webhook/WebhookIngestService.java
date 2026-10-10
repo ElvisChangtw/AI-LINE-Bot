@@ -11,6 +11,7 @@ import com.elvischang.ailinebot.material.MaterialResolver;
 import com.elvischang.ailinebot.material.Resolution;
 import com.elvischang.ailinebot.material.Trigger;
 import com.elvischang.ailinebot.media.MediaStore;
+import com.elvischang.ailinebot.media.TranscribeProperties;
 import com.elvischang.ailinebot.store.InboundEventRepository;
 import com.elvischang.ailinebot.store.JobKind;
 import com.elvischang.ailinebot.store.JobRepository;
@@ -20,6 +21,7 @@ import com.elvischang.ailinebot.store.MaterialRepository;
 import com.elvischang.ailinebot.store.MediaStatus;
 import com.elvischang.ailinebot.store.NewJob;
 import com.linecorp.bot.webhook.model.AudioMessageContent;
+import com.linecorp.bot.webhook.model.ContentProvider;
 import com.linecorp.bot.webhook.model.DeliveryContext;
 import com.linecorp.bot.webhook.model.Event;
 import com.linecorp.bot.webhook.model.ImageMessageContent;
@@ -50,12 +52,13 @@ public class WebhookIngestService {
     private final MaterialResolver resolver;
     private final MediaStore mediaStore;
     private final ApplicationEventPublisher publisher;
+    private final TranscribeProperties transcribe;
     private final BotProperties props;
     private final Clock clock;
 
     public WebhookIngestService(InboundEventRepository inboundEvents, MaterialRepository materials, JobRepository jobs,
                                 MaterialResolver resolver, MediaStore mediaStore, ApplicationEventPublisher publisher,
-                                BotProperties props, Clock clock) {
+                                BotProperties props, TranscribeProperties transcribe, Clock clock) {
         this.inboundEvents = inboundEvents;
         this.materials = materials;
         this.jobs = jobs;
@@ -63,6 +66,7 @@ public class WebhookIngestService {
         this.mediaStore = mediaStore;
         this.publisher = publisher;
         this.props = props;
+        this.transcribe = transcribe;
         this.clock = clock;
     }
 
@@ -93,8 +97,10 @@ public class WebhookIngestService {
         switch (event.message()) {
             case TextMessageContent text -> jobId = ingestText(chatId, text, event.replyToken(), sender, now);
             case ImageMessageContent image -> storeMedia(chatId, image.id(), MaterialKind.IMAGE, sender, now);
-            case AudioMessageContent audio -> storeMedia(chatId, audio.id(), MaterialKind.AUDIO, sender, now);
-            case VideoMessageContent video -> storeMedia(chatId, video.id(), MaterialKind.VIDEO, sender, now);
+            case AudioMessageContent audio -> storeClip(chatId, audio.id(), MaterialKind.AUDIO, sender, audio.duration(),
+                    audio.contentProvider(), now);
+            case VideoMessageContent video -> storeClip(chatId, video.id(), MaterialKind.VIDEO, sender, video.duration(),
+                    video.contentProvider(), now);
             default -> {
             }
         }
@@ -167,6 +173,18 @@ public class WebhookIngestService {
             case Resolution.Notice n -> new NewJob(JobKind.NOTICE, chatId, text.id(),
                     null, null, replyToken, text.quoteToken(), n.text());
         };
+    }
+
+    // Clips are fetched only when asked about; length and hosting are known now, so hopeless ones are marked up front.
+    private void storeClip(String chatId, String messageId, MaterialKind kind, String sender, Long durationMs,
+                           ContentProvider provider, long now) {
+        MediaStatus status = MediaStatus.NONE;
+        if (provider != null && provider.type() != ContentProvider.Type.LINE) {
+            status = MediaStatus.FAILED;
+        } else if (durationMs != null && durationMs > transcribe.maxDuration().toMillis()) {
+            status = MediaStatus.TOO_LARGE;
+        }
+        materials.insert(new Material(chatId, messageId, kind, null, false, status, null, 0, now, expiry(now)), sender, durationMs);
     }
 
     private void storeMedia(String chatId, String messageId, MaterialKind kind, String sender, long now) {

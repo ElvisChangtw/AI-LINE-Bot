@@ -62,7 +62,7 @@ public class MediaStore {
                 future.cancel(true);
                 throw e;
             }
-            String sha256 = writeLimited(content, target);
+            String sha256 = writeLimited(content, target, props.mediaMaxBytes());
             if (materials.markMedia(groupId, messageId, MediaStatus.STORED, sha256) == 0) {
                 delete(groupId, messageId);
                 log.info("media discarded after material removal groupHash={} messageId={}",
@@ -94,6 +94,24 @@ public class MediaStore {
         }
     }
 
+    public int deleteScratchOlderThan(long cutoffMillis) {
+        Path dir = scratchDir();
+        if (!Files.isDirectory(dir)) {
+            return 0;
+        }
+        int deleted = 0;
+        try (var files = Files.list(dir)) {
+            for (Path file : files.toList()) {
+                if (Files.getLastModifiedTime(file).toMillis() < cutoffMillis && Files.deleteIfExists(file)) {
+                    deleted++;
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return deleted;
+    }
+
     public Path pathFor(String groupId, String messageId) {
         if (messageId == null || !MESSAGE_ID.matcher(messageId).matches()) {
             throw new IllegalArgumentException("invalid LINE message id");
@@ -101,12 +119,35 @@ public class MediaStore {
         return props.mediaDir().resolve(Hashes.shortHash(groupId)).resolve(messageId);
     }
 
-    private String writeLimited(BlobContent content, Path target) throws IOException {
+    // Writes LINE content to the media file for this message; throws MediaTooLargeException past the cap.
+    public String store(String groupId, String messageId, BlobContent content, long maxBytes) throws IOException {
+        return writeLimited(content, pathFor(groupId, messageId), maxBytes);
+    }
+
+    public Path scratchDir() {
+        return props.mediaDir().resolve("scratch");
+    }
+
+    // A scratch copy for one-off processing; the caller deletes it, and cleanup catches what a crash left behind.
+    public Path scratch(BlobContent content, String extension, long maxBytes) throws IOException {
+        Path dir = scratchDir();
+        Files.createDirectories(dir);
+        Path file = Files.createTempFile(dir, "media-", "." + extension);
+        try (InputStream in = content.byteStream(); OutputStream out = Files.newOutputStream(file)) {
+            copyLimited(in, out, maxBytes);
+            return file;
+        } catch (IOException | RuntimeException e) {
+            Files.deleteIfExists(file);
+            throw e;
+        }
+    }
+
+    private String writeLimited(BlobContent content, Path target, long maxBytes) throws IOException {
         Files.createDirectories(target.getParent());
         Path temp = Files.createTempFile(target.getParent(), "download-", ".part");
         try (InputStream in = content.byteStream();
              DigestOutputStream out = new DigestOutputStream(Files.newOutputStream(temp), sha256())) {
-            long total = copyLimited(in, out);
+            long total = copyLimited(in, out, maxBytes);
             if (total == 0) {
                 throw new IOException("empty media content");
             }
@@ -119,14 +160,14 @@ public class MediaStore {
         }
     }
 
-    private long copyLimited(InputStream in, OutputStream out) throws IOException {
+    private static long copyLimited(InputStream in, OutputStream out, long maxBytes) throws IOException {
         byte[] buffer = new byte[BUFFER_SIZE];
         long total = 0;
         int read;
         while ((read = in.read(buffer)) != -1) {
             total += read;
-            if (total > props.mediaMaxBytes()) {
-                throw new MediaTooLargeException(props.mediaMaxBytes());
+            if (total > maxBytes) {
+                throw new MediaTooLargeException(maxBytes);
             }
             out.write(buffer, 0, read);
         }

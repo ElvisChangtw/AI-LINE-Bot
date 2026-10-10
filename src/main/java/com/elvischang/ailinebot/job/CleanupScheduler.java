@@ -22,6 +22,8 @@ public class CleanupScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(CleanupScheduler.class);
     private static final Duration SPEND_RETENTION = Duration.ofDays(40);
+    // Longer than any transcription can take, so a file still in use is never removed.
+    private static final Duration SCRATCH_RETENTION = Duration.ofHours(1);
 
     private final MaterialRepository materials;
     private final JobRepository jobs;
@@ -56,6 +58,7 @@ public class CleanupScheduler {
                         Hashes.shortHash(material.groupId()), material.messageId(), e.getClass().getSimpleName());
             }
         }
+        int deletedScratch = mediaStore.deleteScratchOlderThan(now - SCRATCH_RETENTION.toMillis());
         int deletedMaterials = materials.deleteExpired(now);
         int expiredWaiting = jobs.expireWaiting(now - props.waitingTtl().toMillis());
         int clearedJobs = jobs.clearContent(now - props.materialTtl().toMillis());
@@ -63,7 +66,7 @@ public class CleanupScheduler {
         int deletedEvents = inboundEvents.deleteOlderThan(now - props.materialTtl().toMillis());
         int deletedCache = cache.deleteExpired(now);
         int deletedSpend = spending.deleteOlderThan(now - SPEND_RETENTION.toMillis());
-        log.info("cleanup materials={} expiredWaiting={} clearedJobs={} deletedJobs={} deletedEvents={} deletedCache={} deletedSpend={}",
-                deletedMaterials, expiredWaiting, clearedJobs, deletedJobs, deletedEvents, deletedCache, deletedSpend);
+        log.info("cleanup materials={} scratch={} expiredWaiting={} clearedJobs={} deletedJobs={} deletedEvents={} deletedCache={} deletedSpend={}",
+                deletedMaterials, deletedScratch, expiredWaiting, clearedJobs, deletedJobs, deletedEvents, deletedCache, deletedSpend);
     }
 }

@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.OptionalLong;
 
 @Repository
 public class MaterialRepository {
@@ -34,13 +35,19 @@ public class MaterialRepository {
     }
 
     public void insert(Material m, String senderId) {
+        insert(m, senderId, null);
+    }
+
+    public void insert(Material m, String senderId, Long mediaDurationMs) {
         jdbc.sql("""
                         INSERT OR IGNORE INTO material(group_id, message_id, kind, text, is_bot_trigger, media_status,
-                                                       media_sha256, media_attempts, created_at, expires_at, sender_id)
+                                                       media_sha256, media_attempts, created_at, expires_at, sender_id,
+                                                       media_duration_ms)
                         VALUES (:groupId, :messageId, :kind, :text, :botTrigger, :mediaStatus,
-                                :sha, :attempts, :createdAt, :expiresAt, :sender)
+                                :sha, :attempts, :createdAt, :expiresAt, :sender, :duration)
                         """)
                 .param("sender", senderId)
+                .param("duration", mediaDurationMs)
                 .param("groupId", m.groupId())
                 .param("messageId", m.messageId())
                 .param("kind", m.kind().name())
@@ -93,6 +100,30 @@ public class MaterialRepository {
                 .param("bot", includeBotReplies ? 1 : 0)
                 .query((rs, n) -> new RecentMessage(MAPPER.mapRow(rs, n), rs.getString("sender_id")))
                 .list();
+    }
+
+    public OptionalLong mediaDurationMs(String groupId, String messageId) {
+        return jdbc.sql("SELECT media_duration_ms FROM material WHERE group_id = :g AND message_id = :m")
+                .param("g", groupId)
+                .param("m", messageId)
+                .query((rs, n) -> {
+                    long value = rs.getLong(1);
+                    return rs.wasNull() ? OptionalLong.empty() : OptionalLong.of(value);
+                })
+                .optional()
+                .orElse(OptionalLong.empty());
+    }
+
+    public int saveTranscript(String groupId, String messageId, String text, String previewSha256) {
+        return jdbc.sql("""
+                        UPDATE material SET text = :t, media_status = 'STORED', media_sha256 = :sha
+                        WHERE group_id = :g AND message_id = :m
+                        """)
+                .param("t", text)
+                .param("sha", previewSha256)
+                .param("g", groupId)
+                .param("m", messageId)
+                .update();
     }
 
     public int markMedia(String groupId, String messageId, MediaStatus status, String sha256) {

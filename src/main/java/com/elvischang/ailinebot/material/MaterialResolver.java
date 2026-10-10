@@ -53,7 +53,7 @@ public class MaterialResolver {
     private Resolution checkable(Material material) {
         return switch (material.kind()) {
             case BOT_REPLY -> new Resolution.Notice(BotReplies.QUOTED_BOT_REPLY);
-            case AUDIO, VIDEO -> new Resolution.Notice(BotReplies.MEDIA_UNSUPPORTED);
+            case AUDIO, VIDEO -> new Resolution.FactCheck(material);
             case IMAGE -> switch (material.mediaStatus()) {
                 case FAILED -> new Resolution.Notice(BotReplies.IMAGE_GONE);
                 case TOO_LARGE -> new Resolution.Notice(BotReplies.IMAGE_TOO_LARGE);

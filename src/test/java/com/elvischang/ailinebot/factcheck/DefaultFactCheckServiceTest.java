@@ -119,6 +119,26 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
     }
 
     @Test
+    void mediaIsCheckedFromItsTranscriptWithTheVideoFrame() throws Exception {
+        answerWithResult();
+        long now = clock.millis();
+        Material voice = new Material("Cg1", "501", MaterialKind.AUDIO, "健保卡要停用了", false, MediaStatus.STORED, null, 0, now, now + 1);
+        storedImage("502", "sha502");
+        Material video = new Material("Cg1", "502", MaterialKind.VIDEO, "吃苦瓜治癌", false, MediaStatus.STORED, "sha502", 0, now, now + 1);
+
+        ask(voice, "");
+        ask(video, "");
+        ask(video, "");
+
+        ArgumentCaptor<FactCheckInput> sent = ArgumentCaptor.forClass(FactCheckInput.class);
+        verify(checker, times(2)).check(sent.capture());
+        assertThat(sent.getAllValues().get(0).materialText()).isEqualTo(DefaultFactCheckService.VOICE_LABEL + "健保卡要停用了");
+        assertThat(sent.getAllValues().get(0).image()).isNull();
+        assertThat(sent.getAllValues().get(1).materialText()).isEqualTo(DefaultFactCheckService.VIDEO_LABEL + "吃苦瓜治癌");
+        assertThat(sent.getAllValues().get(1).image()).isNotNull();
+    }
+
+    @Test
     void differentImagesAndATextMatchingAnImageShaNeverShareACacheEntry() throws Exception {
         answerWithResult();
 

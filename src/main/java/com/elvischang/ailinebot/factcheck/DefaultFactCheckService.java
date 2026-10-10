@@ -35,6 +35,11 @@ public class DefaultFactCheckService implements FactCheckService {
     private static final Logger log = LoggerFactory.getLogger(DefaultFactCheckService.class);
     private static final ZoneId TAIPEI = ZoneId.of("Asia/Taipei");
     private static final Pattern LINK = Pattern.compile("https?://[^\\s<>\"'）)」]+", Pattern.CASE_INSENSITIVE);
+    // Speech-to-text may mishear and often comes back in simplified characters; the prompt explains both.
+    static final String VOICE_LABEL = "（語音訊息轉成的文字）\n";
+    static final String VIDEO_LABEL = "（影片的語音轉成的文字，圖片是影片的一個畫面）\n";
+    static final String VIDEO_NO_FRAME_LABEL = "（影片的語音轉成的文字）\n";
+    static final String VIDEO_FRAME_ONLY_LABEL = "（影片裡沒有聽到說話，下面只附影片的一個畫面）\n";
     private static final Pattern SCHEME_AND_WWW = Pattern.compile("^(https?://)?(www\\.)?", Pattern.CASE_INSENSITIVE);
     private static final Pattern WHITESPACE = Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS);
 
@@ -68,12 +73,26 @@ public class DefaultFactCheckService implements FactCheckService {
         if (material.kind() == MaterialKind.IMAGE && (material.mediaSha256() == null || material.mediaSha256().isBlank())) {
             return FactCheckReply.notice(BotReplies.IMAGE_GONE);
         }
+        if (material.kind() == MaterialKind.AUDIO || material.kind() == MaterialKind.VIDEO) {
+            return checkMedia(groupId, material, userQuestion);
+        }
         String text = material.kind() == MaterialKind.IMAGE ? null : material.text();
         byte[] image = material.kind() == MaterialKind.IMAGE ? readImage(material) : null;
         if (material.kind() == MaterialKind.IMAGE && image == null) {
             return FactCheckReply.notice(BotReplies.IMAGE_GONE);
         }
         return check(groupId, text, image, material.mediaSha256(), userQuestion);
+    }
+
+    // Callers transcribe first (MediaTranscriber); a video also brings its preview frame when LINE had one.
+    private FactCheckReply checkMedia(String groupId, Material media, String userQuestion) {
+        String words = media.text() == null ? "" : media.text();
+        if (media.kind() == MaterialKind.AUDIO) {
+            return check(groupId, VOICE_LABEL + words, null, null, userQuestion);
+        }
+        byte[] frame = media.mediaSha256() == null ? null : readImage(media);
+        String label = frame == null ? VIDEO_NO_FRAME_LABEL : words.isBlank() ? VIDEO_FRAME_ONLY_LABEL : VIDEO_LABEL;
+        return check(groupId, label + words, frame, frame == null ? null : media.mediaSha256(), userQuestion);
     }
 
     private FactCheckReply check(String groupId, String text, byte[] image, String imageSha256, String userQuestion) {

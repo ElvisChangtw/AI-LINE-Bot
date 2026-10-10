@@ -65,8 +65,18 @@ class CleanupSchedulerTest extends IntegrationTestSupport {
         cache.put("k", FactCheckResult.factCheck(Verdict.CORRECT, false, "s", List.of(), true, List.of()), start);
 
         clock.advance(Duration.ofDays(8));
+        var leftover = mediaStore.scratchDir().resolve("media-old.mp4");
+        var inUse = mediaStore.scratchDir().resolve("media-new.m4a");
+        Files.createDirectories(leftover.getParent());
+        Files.writeString(leftover, "x");
+        Files.writeString(inUse, "x");
+        Files.setLastModifiedTime(leftover, java.nio.file.attribute.FileTime.fromMillis(clock.millis() - Duration.ofHours(2).toMillis()));
+        Files.setLastModifiedTime(inUse, java.nio.file.attribute.FileTime.fromMillis(clock.millis()));
         cleanup.cleanup();
 
+        assertThat(Files.exists(leftover)).isFalse();
+        assertThat(Files.exists(inUse)).isTrue();
+        Files.delete(inUse);
         assertThat(jdbc.sql("SELECT COUNT(*) FROM verification_cache").query(Long.class).single()).isZero();
         assertThat(spending.sumSince(0)).isEqualTo(5);
         assertThat(materials.find("Cg1", "200")).isEmpty();

@@ -22,3 +22,5 @@ bot:
   scheduling-enabled: false
 factcheck:
   api-key: test-key
+transcribe:
+  max-bytes: 64

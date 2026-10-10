@@ -9,7 +9,10 @@ public final class BotReplies {
     public static final String QUOTE_NOT_FOUND =
             "找不到你引用的那則訊息（可能超過 7 天，或是在我加入群組之前），請重新貼一次再 @ 我。";
     public static final String QUOTED_BOT_REPLY = "這是我之前的回覆喔。";
-    public static final String MEDIA_UNSUPPORTED = "語音和影片之後才支援，目前請傳文字或圖片。";
+    public static final String MEDIA_NOT_READY = "這段影音還在處理，請過一分鐘再問我一次";
+    public static final String MEDIA_TOO_LONG = "這段影音太長了（上限 5 分鐘），我還看不完，可以截一張重點畫面給我嗎？";
+    public static final String MEDIA_GONE = "這段影音已經拿不到了，請重新傳一次再引用我。";
+    public static final String MEDIA_UNCLEAR = "這段語音我聽不出內容，可以打字告訴我它在說什麼嗎？";
     public static final String IMAGE_GONE = "這張圖已經拿不到了，請重新傳一次再引用我。";
     public static final String IMAGE_TOO_LARGE = "這張圖太大了（超過 10MB），請傳小一點的圖。";
     public static final String IMAGINE_NEEDS_PROMPT = "請在 /imagine 後面寫你想畫的內容，例如：/imagine 一隻戴帽子的貓";
@@ -29,7 +32,7 @@ public final class BotReplies {
             ・有問題可以直接 @ 我，我會上網查資料回答
             ・要查證某則訊息，請「引用」那則訊息，再 @ 我
             ・沒被 @ 的時候，我不會讀內容、也不會回覆
-            ・為了讓大家之後能引用，群組的文字和圖片會暫存 7 天，到期自動刪除
+            ・為了讓大家之後能引用，群組的文字和圖片會暫存 7 天，到期自動刪除；語音和影片只有被問到時才會下載，轉成文字後一樣存 7 天
             ・你問的問題和引用的訊息，會送到 OpenAI 搜尋與回答""";
     public static final String SAFETY_TIP = "不要點連結、不要給驗證碼和帳號密碼，不放心可以打 165 問";
     public static final String LINK_NOT_OPENED = "（我沒有打開訊息裡的連結）";
