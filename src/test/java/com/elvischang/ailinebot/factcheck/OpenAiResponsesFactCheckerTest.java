@@ -95,6 +95,20 @@ class OpenAiResponsesFactCheckerTest extends IntegrationTestSupport {
     }
 
     @Test
+    void aSearchCallWithoutAnActionConsultedNothing() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode root = (ObjectNode) mapper.readTree(fixture("response-vaccine.json"));
+        ((com.fasterxml.jackson.databind.node.ArrayNode) root.get("output")).insert(1,
+                mapper.readTree("{\"id\":\"ws_0\",\"type\":\"web_search_call\",\"status\":\"failed\"}"));
+        LINE.stubFor(post(urlEqualTo(RESPONSES)).willReturn(okJson(mapper.writeValueAsString(root))));
+
+        ModelCheck check = checker.check(textInput("x"));
+
+        assertThat(check.consultedUrls()).hasSize(3);
+        assertThat(check.usage().searchCalls()).isEqualTo(2);
+    }
+
+    @Test
     void sendsImagesAsDataUrls() throws Exception {
         LINE.stubFor(post(urlEqualTo(RESPONSES)).willReturn(okJson(fixture("response-vaccine.json"))));
 

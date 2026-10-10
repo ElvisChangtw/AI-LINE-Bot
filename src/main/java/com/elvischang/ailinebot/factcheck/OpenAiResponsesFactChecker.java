@@ -96,7 +96,7 @@ public class OpenAiResponsesFactChecker implements FactChecker {
                         text.append(outputText.text());
                         outputText.annotations().stream()
                                 .filter(a -> a.isUrlCitation())
-                                .forEach(a -> consulted.add(a.asUrlCitation().url()));
+                                .forEach(a -> a.asUrlCitation()._url().asString().ifPresent(consulted::add));
                     }
                 }
             }
@@ -173,11 +173,12 @@ public class OpenAiResponsesFactChecker implements FactChecker {
     }
 
     private static List<String> searchSources(ResponseFunctionWebSearch call) {
-        var action = call.action();
-        if (!action.isSearch()) {
+        // Failed or partial calls can come back without an action; they consulted nothing.
+        var action = call._action().asKnown();
+        if (action.isEmpty() || !action.get().isSearch()) {
             return List.of();
         }
-        return action.asSearch().sources().orElse(List.of()).stream()
+        return action.get().asSearch().sources().orElse(List.of()).stream()
                 .flatMap(source -> source._url().asString().stream())
                 .toList();
     }
