@@ -9,13 +9,15 @@
 
 ## 1. 網域與 Cloudflare Tunnel
 
+> ✅ 2026-10-10 已完成：網域 `elvischang.dev`、tunnel `ai-line-bot`（ID `506eea9e-26a1-462c-8fba-7bb853711223`）、route `bot.elvischang.dev` + `^/callback$` → `http://app:8080`（DNS CNAME 自動建立）、Bot Fight Mode 確認是關的。新版 dashboard 的位置是 Networking → Tunnels（不用開 Zero Trust），route 在 tunnel 的 Routes 分頁 → Add route → Published application。
+
 1. Cloudflare dashboard → Domain Registration 買一個網域（例如 `.com`，約 US$10／年）。
 2. Zero Trust → Networks → Tunnels → Create a tunnel（Cloudflared）→ 取名 `ai-line-bot` → 複製 token（`eyJ...` 那串），先存好，第 4 步要用。
 3. 同一個 tunnel → Public Hostname → Add：
    - Subdomain `bot`、Domain 選剛買的網域
    - Path：`^/callback$`
    - Service：`HTTP`、URL：`app:8080`
-4. Security → Bots：**關掉 Bot Fight Mode**。免費方案的 Bot Fight Mode 不能用 WAF 規則跳過，開著的話 LINE 的 POST 可能被擋成 challenge。如果有開 managed rules，再到 Security → WAF 加一條 custom rule：`URI Path equals /callback` → Skip managed rules。
+4. Security → Bots：**關掉 Bot Fight Mode**。免費方案的 Bot Fight Mode 不能用 WAF 規則跳過，開著的話 LINE 的 POST 可能被擋成 challenge。免費方案的 Cloudflare managed ruleset 固定開著、關不掉；先不加 skip rule，只有 LINE Verify 或實際 webhook 拿到 403 時，才到 Security → Security rules 加 custom rule：`http.host eq "bot.<網域>" and http.request.uri.path eq "/callback"` → Skip 所有 managed rules。
 
 ## 2. AWS 資源
 
