@@ -1,0 +1,118 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit to deploy, e.g. to roll back (default is the head of main)
+        required: false
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # No `environment:` here: it would change the OIDC sub claim and break the role's branch condition.
+    if: vars.DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      SSM_INSTANCE_ID: ${{ vars.SSM_INSTANCE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+
+      - name: Resolve the commit
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+
+      - name: Check whether the image already exists
+        id: image
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          if aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$SHA" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-java@v4
+        if: steps.image.outputs.exists == 'false'
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Test
+        if: steps.image.outputs.exists == 'false'
+        run: mvn -B verify
+
+      - name: Build and push the image
+        if: steps.image.outputs.exists == 'false'
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ steps.commit.outputs.sha }}
+        run: |
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Run deploy.sh on the host
+        env:
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          # Ship the compose file and scripts from this commit, so the host always runs the matching versions.
+          compose_b64="$(base64 -w0 infra/host/docker-compose.yml)"
+          deploy_b64="$(base64 -w0 infra/host/deploy.sh)"
+          backup_b64="$(base64 -w0 infra/host/backup.sh)"
+          jq -n --arg c "$compose_b64" --arg d "$deploy_b64" --arg b "$backup_b64" --arg sha "$SHA" '{commands: [
+            "set -eu",
+            "echo \($c) | base64 -d > /opt/linebot/docker-compose.yml",
+            "echo \($d) | base64 -d > /opt/linebot/deploy.sh",
+            "echo \($b) | base64 -d > /opt/linebot/backup.sh",
+            "chmod 700 /opt/linebot/deploy.sh /opt/linebot/backup.sh",
+            "/opt/linebot/deploy.sh \($sha)"
+          ]}' > params.json
+          command_id="$(aws ssm send-command --instance-ids "$SSM_INSTANCE_ID" --document-name AWS-RunShellScript \
+            --parameters file://params.json --timeout-seconds 600 --comment "deploy $SHA" \
+            --query Command.CommandId --output text)"
+          echo "command $command_id"
+
+          # `aws ssm wait` gives up after 100 seconds and cannot tell a timeout from a failure, so poll ourselves.
+          deadline=$((SECONDS + 300))
+          status=""
+          code=""
+          while (( SECONDS < deadline )); do
+            sleep 5
+            if ! result="$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$SSM_INSTANCE_ID" \
+                  --query '[Status, ResponseCode]' --output text 2>&1)"; then
+              if grep -q InvocationDoesNotExist <<<"$result"; then continue; fi
+              echo "$result"
+              exit 1
+            fi
+            read -r status code <<<"$result"
+            case "$status" in
+              Pending|InProgress|Delayed) continue ;;
+              *) break ;;
+            esac
+          done
+          aws ssm get-command-invocation --command-id "$command_id" --instance-id "$SSM_INSTANCE_ID" \
+            --query '[StandardOutputContent, StandardErrorContent]' --output text || true
+          echo "status=$status exit=$code"
+          [[ "$status" == "Success" && "$code" == "0" ]]
