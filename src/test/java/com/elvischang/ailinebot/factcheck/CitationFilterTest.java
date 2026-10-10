@@ -77,4 +77,17 @@ class CitationFilterTest {
         FactCheckResult filtered = CitationFilter.apply(result(Verdict.INCORRECT, "not a url %%"), Set.of("not a url %%"));
         assertThat(filtered.sources()).hasSize(1);
     }
+
+    @Test
+    void anAnswerWithoutSurvivingSourcesKeepsItsMode() {
+        FactCheckResult answer = new FactCheckResult(Verdict.NOT_APPLICABLE, false, "帶傘", List.of(), false,
+                List.of(source("https://made.up/x")), ReplyMode.ANSWER, false, List.of("會下雨"));
+
+        FactCheckResult filtered = CitationFilter.apply(answer, Set.of());
+
+        assertThat(filtered.mode()).isEqualTo(ReplyMode.ANSWER);
+        assertThat(filtered.overall()).isEqualTo(Verdict.NOT_APPLICABLE);
+        assertThat(filtered.answerPoints()).containsExactly("會下雨");
+        assertThat(filtered.sources()).isEmpty();
+    }
 }

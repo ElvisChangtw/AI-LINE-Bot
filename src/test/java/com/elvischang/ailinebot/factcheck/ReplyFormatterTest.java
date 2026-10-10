@@ -88,4 +88,78 @@ class ReplyFormatterTest {
         assertThat(text.length()).isLessThanOrEqualTo(500);
         assertThat(text).startsWith("【查證結果】部分正確，重點\n・");
     }
+
+    private static final FactCheckResult.Source CWA =
+            new FactCheckResult.Source("https://www.cwa.gov.tw/V8/C/W/County/County.html?CID=63", "臺北市天氣", "中央氣象署", "");
+
+    private static FactCheckResult answer(boolean highRisk, List<String> points, List<FactCheckResult.Source> sources) {
+        return new FactCheckResult(Verdict.NOT_APPLICABLE, false, "明天台北會下雨，傘記得帶", List.of(), false, sources,
+                ReplyMode.ANSWER, highRisk, points);
+    }
+
+    @Test
+    void formatsAnAnswerLikeTheSpecExample() {
+        assertThat(ReplyFormatter.format(answer(true, List.of("降雨機率 70%，出門前看一下天色"), List.of(CWA)), false))
+                .isEqualTo("""
+                        【回答】明天台北會下雨，傘記得帶
+                        ・降雨機率 70%，出門前看一下天色
+                        來源：中央氣象署
+                        https://www.cwa.gov.tw/V8/C/W/County/County.html?CID=63""");
+    }
+
+    @Test
+    void aHighRiskAnswerWithoutSourcesIsReplacedByTheFixedReply() {
+        assertThat(ReplyFormatter.format(answer(true, List.of("降血壓藥配葡萄柚沒問題"), List.of()), false))
+                .isEqualTo(BotReplies.HIGH_RISK_NO_SOURCE);
+    }
+
+    @Test
+    void aLowRiskAnswerWithoutSourcesIsSentAsIs() {
+        assertThat(ReplyFormatter.format(answer(false, List.of("滷肉先炒糖色再下醬油"), List.of()), true))
+                .isEqualTo("【回答】明天台北會下雨，傘記得帶\n・滷肉先炒糖色再下醬油\n" + BotReplies.LINK_NOT_OPENED);
+    }
+
+    @Test
+    void anAnswerNeverAsksPeopleToStopForwardingAndKeepsSafetyTips() {
+        FactCheckResult scamAnswer = new FactCheckResult(Verdict.NOT_APPLICABLE, false, "不要給驗證碼", List.of(), true,
+                List.of(CWA), ReplyMode.ANSWER, true, List.of("銀行不會打電話要驗證碼"));
+
+        assertThat(ReplyFormatter.format(scamAnswer, false)).contains(BotReplies.SAFETY_TIP)
+                .doesNotContain(BotReplies.NO_FORWARD_NEEDED);
+    }
+
+    @Test
+    void needMaterialAsksToQuote() {
+        FactCheckResult need = new FactCheckResult(Verdict.NOT_APPLICABLE, false, "", List.of(), false, List.of(),
+                ReplyMode.NEED_MATERIAL, false, List.of());
+        assertThat(ReplyFormatter.format(need, false)).isEqualTo(BotReplies.ASK_TO_QUOTE);
+    }
+
+    @Test
+    void stripsLinksFromAnswerPointsAndPublishers() {
+        FactCheckResult.Source sneaky = new FactCheckResult.Source("https://www.cwa.gov.tw/a", "t", "加 LINE https://evil.example", "");
+        FactCheckResult.Source onlyLink = new FactCheckResult.Source("https://www.cwa.gov.tw/b", "t", "www.evil.example", "");
+
+        String text = ReplyFormatter.format(answer(false, List.of("看這裡 https://evil.example/x", "https://evil.example"),
+                List.of(sneaky, onlyLink)), false);
+
+        assertThat(text).doesNotContain("evil.example").contains("・看這裡\n").doesNotContain("・\n")
+                .contains("來源：加 LINE\nhttps://www.cwa.gov.tw/a").contains("來源：cwa.gov.tw\nhttps://www.cwa.gov.tw/b");
+    }
+
+    @Test
+    void anAnswerWhoseWordsWereAllLinksSaysNothingReliableWasFound() {
+        FactCheckResult allLinks = new FactCheckResult(Verdict.NOT_APPLICABLE, false, "https://evil.example", List.of(), false,
+                List.of(), ReplyMode.ANSWER, false, List.of("www.evil.example"));
+        assertThat(ReplyFormatter.format(allLinks, false)).isEqualTo("【回答】\n・" + BotReplies.NOTHING_RELIABLE_FOUND);
+    }
+
+    @Test
+    void anAnswerNeverExceedsThreeHundredCharacters() {
+        String longPoint = "很長的回答".repeat(40);
+        String text = ReplyFormatter.format(answer(false, List.of(longPoint, longPoint), List.of(CWA, CWA)), false);
+
+        assertThat(text.length()).isLessThanOrEqualTo(300);
+        assertThat(text).startsWith("【回答】明天台北會下雨，傘記得帶\n・");
+    }
 }

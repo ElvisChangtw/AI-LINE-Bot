@@ -13,9 +13,11 @@ import java.util.regex.Pattern;
 public final class ReplyFormatter {
 
     private static final int MAX_LENGTH = 500;
+    private static final int MAX_ANSWER_LENGTH = 300;
     private static final int MAX_REASONS = 3;
     private static final int MAX_SOURCES = 2;
     private static final String PREFIX = "【查證結果】";
+    private static final String ANSWER_PREFIX = "【回答】";
     private static final String BULLET = "・";
     private static final Pattern LINK = Pattern.compile("(https?://|www\\.)\\S+", Pattern.CASE_INSENSITIVE);
     private static final Map<Verdict, String> LABELS = new EnumMap<>(Map.of(
@@ -30,14 +32,52 @@ public final class ReplyFormatter {
     }
 
     public static String format(FactCheckResult result, boolean materialHasLink) {
+        return switch (result.mode()) {
+            case FACT_CHECK -> factCheck(result, materialHasLink);
+            case ANSWER -> answer(result, materialHasLink);
+            case NEED_MATERIAL -> BotReplies.ASK_TO_QUOTE;
+        };
+    }
+
+    private static String answer(FactCheckResult result, boolean materialHasLink) {
+        if (result.highRisk() && result.sources().isEmpty()) {
+            return BotReplies.HIGH_RISK_NO_SOURCE;
+        }
+        String headline = withoutLinks(result.headline());
+        List<String> points = new ArrayList<>(bullets(result.answerPoints()));
+        if (points.isEmpty() && headline.isEmpty()) {
+            points.add(BULLET + BotReplies.NOTHING_RELIABLE_FOUND);
+        }
+        List<String> notes = new ArrayList<>();
+        if (result.safetyTip()) {
+            notes.add(BotReplies.SAFETY_TIP);
+        }
+        if (materialHasLink) {
+            notes.add(BotReplies.LINK_NOT_OPENED);
+        }
+        return fit(ANSWER_PREFIX + headline, points, notes, sources(result), MAX_ANSWER_LENGTH);
+    }
+
+    private static List<String> bullets(List<String> modelTexts) {
+        return modelTexts.stream()
+                .map(ReplyFormatter::withoutLinks)
+                .filter(text -> !text.isEmpty())
+                .map(text -> BULLET + text)
+                .limit(MAX_REASONS)
+                .toList();
+    }
+
+    private static List<String> sources(FactCheckResult result) {
+        return new ArrayList<>(result.sources().stream()
+                .limit(MAX_SOURCES)
+                .map(ReplyFormatter::sourceBlock)
+                .toList());
+    }
+
+    private static String factCheck(FactCheckResult result, boolean materialHasLink) {
         String headline = withoutLinks(result.headline());
         String header = PREFIX + LABELS.get(result.overall()) + (headline.isEmpty() ? "" : "，" + headline);
-        List<String> reasons = new ArrayList<>(result.claims().stream()
-                .map(claim -> withoutLinks(claim.reason()))
-                .filter(reason -> !reason.isEmpty())
-                .map(reason -> BULLET + reason)
-                .limit(MAX_REASONS)
-                .toList());
+        List<String> reasons = new ArrayList<>(bullets(result.claims().stream().map(FactCheckResult.Claim::reason).toList()));
         if (reasons.isEmpty() && result.overall() == Verdict.INSUFFICIENT_EVIDENCE) {
             reasons.add(BULLET + BotReplies.NOTHING_RELIABLE_FOUND);
         }
@@ -52,21 +92,20 @@ public final class ReplyFormatter {
                 || result.overall() == Verdict.OUTDATED_OR_MISSING_CONDITIONS)) {
             notes.add(BotReplies.NO_FORWARD_NEEDED);
         }
-        List<String> sources = new ArrayList<>(result.sources().stream()
-                .limit(MAX_SOURCES)
-                .map(ReplyFormatter::sourceBlock)
-                .toList());
+        return fit(header, reasons, notes, sources(result), MAX_LENGTH);
+    }
 
-        String text = join(header, reasons, notes, sources);
-        while (text.length() > MAX_LENGTH && !sources.isEmpty()) {
+    private static String fit(String header, List<String> lines, List<String> notes, List<String> sources, int maxLength) {
+        String text = join(header, lines, notes, sources);
+        while (text.length() > maxLength && !sources.isEmpty()) {
             sources.remove(sources.size() - 1);
-            text = join(header, reasons, notes, sources);
+            text = join(header, lines, notes, sources);
         }
-        while (text.length() > MAX_LENGTH && reasons.size() > 1) {
-            reasons.remove(reasons.size() - 1);
-            text = join(header, reasons, notes, sources);
+        while (text.length() > maxLength && lines.size() > 1) {
+            lines.remove(lines.size() - 1);
+            text = join(header, lines, notes, sources);
         }
-        return text.length() > MAX_LENGTH ? text.substring(0, MAX_LENGTH - 1) + "…" : text;
+        return text.length() > maxLength ? text.substring(0, maxLength - 1) + "…" : text;
     }
 
     private static String withoutLinks(String modelText) {
@@ -74,7 +113,8 @@ public final class ReplyFormatter {
     }
 
     private static String sourceBlock(FactCheckResult.Source source) {
-        String name = source.publisher() == null || source.publisher().isBlank() ? host(source.url()) : source.publisher().trim();
+        String publisher = withoutLinks(source.publisher());
+        String name = publisher.isEmpty() ? host(source.url()) : publisher;
         String date = source.publishedDate() == null || source.publishedDate().isBlank() ? "" : "（" + source.publishedDate().trim() + "）";
         return "來源：" + name + date + "\n" + source.url();
     }

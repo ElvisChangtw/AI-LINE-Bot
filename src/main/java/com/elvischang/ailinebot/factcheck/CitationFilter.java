@@ -26,7 +26,8 @@ public final class CitationFilter {
                 .filter(source -> isPresent(source.url()))
                 .filter(source -> consulted.contains(normalize(source.url())))
                 .toList();
-        if (kept.isEmpty() && result.overall() != Verdict.OPINION) {
+        // Answers without sources are handled by ReplyFormatter according to their risk.
+        if (kept.isEmpty() && result.mode() == ReplyMode.FACT_CHECK && result.overall() != Verdict.OPINION) {
             return result.downgradedToInsufficient();
         }
         return result.withSources(kept);

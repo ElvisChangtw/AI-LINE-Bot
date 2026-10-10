@@ -11,16 +11,19 @@ public final class BotReplies {
     public static final String IMAGINE_NEEDS_PROMPT = "請在 /imagine 後面寫你想畫的內容，例如：/imagine 一隻戴帽子的貓";
     public static final String ASK_TO_QUOTE = "請「引用」你要查的那則訊息，再 @ 我。";
     public static final String TOO_MANY_CANDIDATES = "最近有好幾則訊息，請「引用」你要查的那一則再 @ 我。";
-    public static final String JOB_FAILED = "這則沒查成功，請再問我一次。";
-    public static final String QUOTA_EXCEEDED = "今天的查證次數用完了，明天再問我";
+    public static final String JOB_FAILED = "這題我卡住了，再問我一次好嗎？";
+    public static final String QUOTA_EXCEEDED = "今天的額度被大家問光了，我先去充電，明天見 🔋";
+    public static final String HIGH_RISK_NO_SOURCE =
+            "這題我查不到可靠的資料，不敢亂回答。健康、用藥請問醫師或藥師；補助、法規可以打 1999 問。";
     public static final String IMAGE_NOT_READY = "這張圖還在處理，請過一分鐘再問我一次";
     public static final String DELAYED_PREFIX = "（回覆剛才的問題）\n";
     public static final String JOIN_NOTICE = """
-            大家好，我是查證小幫手。
-            ・要查證時，請「引用」那則訊息，再 @ 我
+            大家好，我是小幫手。
+            ・有問題可以直接 @ 我，我會上網查資料回答
+            ・要查證某則訊息，請「引用」那則訊息，再 @ 我
             ・沒被 @ 的時候，我不會讀內容、也不會回覆
             ・為了讓大家之後能引用，群組的文字和圖片會暫存 7 天，到期自動刪除
-            ・查證時，內容會送到 OpenAI 搜尋與判讀""";
+            ・你問的問題和引用的訊息，會送到 OpenAI 搜尋與回答""";
     public static final String SAFETY_TIP = "不要點連結、不要給驗證碼和帳號密碼，不放心可以打 165 問";
     public static final String LINK_NOT_OPENED = "（我沒有打開訊息裡的連結）";
     public static final String NO_FORWARD_NEEDED = "不用擔心，這則可以不用再轉傳囉";
