@@ -62,7 +62,7 @@ class CleanupSchedulerTest extends IntegrationTestSupport {
         jobs.markWaiting(List.of(waiting), start);
 
         spending.record(start, 5);
-        cache.put("k", new FactCheckResult(Verdict.CORRECT, false, "s", List.of(), true, List.of()), start);
+        cache.put("k", FactCheckResult.factCheck(Verdict.CORRECT, false, "s", List.of(), true, List.of()), start);
 
         clock.advance(Duration.ofDays(8));
         cleanup.cleanup();

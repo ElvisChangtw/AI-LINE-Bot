@@ -14,7 +14,7 @@ class VerificationCacheRepositoryTest extends IntegrationTestSupport {
     @Autowired
     VerificationCacheRepository cache;
 
-    private final FactCheckResult result = new FactCheckResult(Verdict.INCORRECT, false, "重點",
+    private final FactCheckResult result = FactCheckResult.factCheck(Verdict.INCORRECT, false, "重點",
             List.of(new FactCheckResult.Claim("c", Verdict.INCORRECT, "理由")), true,
             List.of(new FactCheckResult.Source("https://a.gov.tw/1", "t", "p", "")));
 
@@ -26,6 +26,16 @@ class VerificationCacheRepositoryTest extends IntegrationTestSupport {
         assertThat(cache.get("k", now + Duration.ofHours(23).toMillis())).contains(result);
         assertThat(cache.get("k", now + Duration.ofHours(25).toMillis())).isEmpty();
         assertThat(cache.deleteExpired(now + Duration.ofHours(25).toMillis())).isEqualTo(1);
+    }
+
+    @Test
+    void keepsTheReplyModeAndAnswerFields() {
+        long now = clock.millis();
+        FactCheckResult answer = new FactCheckResult(Verdict.NOT_APPLICABLE, false, "帶傘", List.of(), false,
+                List.of(), ReplyMode.ANSWER, true, List.of("降雨機率 70%"));
+        cache.put("k", answer, now);
+
+        assertThat(cache.get("k", now)).contains(answer);
     }
 
     @Test
@@ -42,7 +52,8 @@ class VerificationCacheRepositoryTest extends IntegrationTestSupport {
     void treatsUnreadableOrIncompleteRowsAsMisses() {
         long now = clock.millis();
         String insert = "INSERT INTO verification_cache(content_hash, result_json, created_at, expires_at) VALUES (:k, :json, :now, :exp)";
-        String[] rows = {"garbage", "{\"overall\":\"CORRECT\",\"headline\":\"h\",\"sources\":[]}"};
+        String[] rows = {"garbage", "{\"overall\":\"CORRECT\",\"headline\":\"h\",\"sources\":[]}",
+                "{\"overall\":\"CORRECT\",\"political\":false,\"headline\":\"h\",\"claims\":[],\"safetyTip\":false,\"sources\":[]}"};
         for (int i = 0; i < rows.length; i++) {
             jdbc.sql(insert).param("k", "bad" + i).param("json", rows[i]).param("now", now).param("exp", now + 1000).update();
             assertThat(cache.get("bad" + i, now)).isEmpty();

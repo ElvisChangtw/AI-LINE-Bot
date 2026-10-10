@@ -35,6 +35,9 @@ import java.util.Set;
 public class OpenAiResponsesFactChecker implements FactChecker {
 
     private static final int MAX_CLAIMS = 3;
+    private static final int MAX_ANSWER_POINTS = 2;
+    private static final String NO_QUESTION = "使用者沒有寫問題，請查證下面的素材";
+    private static final List<String> DELIMITERS = List.of("<<<問題開始>>>", "<<<問題結束>>>", "<<<素材開始>>>", "<<<素材結束>>>");
     private static final long ESTIMATED_FAILURE_INPUT_TOKENS = 20_000;
     private static final long ESTIMATED_FAILURE_OUTPUT_TOKENS = 4_000;
     private static final int FIRST_SERVER_ERROR_STATUS = 500;
@@ -147,13 +150,22 @@ public class OpenAiResponsesFactChecker implements FactChecker {
     }
 
     private static String userText(FactCheckInput input) {
-        String material = input.materialText() == null ? IMAGE_PLACEHOLDER : input.materialText()
-                .replace("<<<素材開始>>>", "＜＜＜素材開始＞＞＞")
-                .replace("<<<素材結束>>>", "＜＜＜素材結束＞＞＞");
-        String question = input.userQuestion() == null || input.userQuestion().isBlank() ? "這是真的嗎？" : input.userQuestion();
-        return "使用者的問題：" + question + "\n"
-                + "今天日期：" + input.today() + "（台灣時間）\n"
-                + "<<<素材開始>>>\n" + material + "\n<<<素材結束>>>";
+        String question = input.userQuestion() == null || input.userQuestion().isBlank() ? NO_QUESTION : input.userQuestion();
+        String text = "今天日期：" + input.today() + "（台灣時間）\n"
+                + "<<<問題開始>>>\n" + neutralized(question) + "\n<<<問題結束>>>";
+        if (input.materialText() == null && input.image() == null) {
+            return text;
+        }
+        String material = input.materialText() == null ? IMAGE_PLACEHOLDER : neutralized(input.materialText());
+        return text + "\n<<<素材開始>>>\n" + material + "\n<<<素材結束>>>";
+    }
+
+    private static String neutralized(String untrusted) {
+        String result = untrusted;
+        for (String delimiter : DELIMITERS) {
+            result = result.replace(delimiter, delimiter.replace("<<<", "＜＜＜").replace(">>>", "＞＞＞"));
+        }
+        return result;
     }
 
     private static List<String> searchSources(ResponseFunctionWebSearch call) {
@@ -173,6 +185,7 @@ public class OpenAiResponsesFactChecker implements FactChecker {
         } catch (Exception e) {
             throw new InvalidModelOutputException("output is not JSON");
         }
+        ReplyMode mode = mode(root);
         Verdict overall = verdict(root, "overall_verdict");
         List<FactCheckResult.Claim> claims = new ArrayList<>();
         for (JsonNode claim : array(root, "claims")) {
@@ -186,8 +199,37 @@ public class OpenAiResponsesFactChecker implements FactChecker {
             sources.add(new FactCheckResult.Source(text(source, "url"), text(source, "title"),
                     text(source, "publisher"), text(source, "published_date")));
         }
+        List<String> answerPoints = new ArrayList<>();
+        for (JsonNode point : array(root, "answer_points")) {
+            if (!point.isTextual()) {
+                throw new InvalidModelOutputException("answer point is not text");
+            }
+            if (!point.asText().isBlank() && answerPoints.size() < MAX_ANSWER_POINTS) {
+                answerPoints.add(point.asText());
+            }
+        }
+        checkConsistent(mode, overall, answerPoints);
         return new FactCheckResult(overall, bool(root, "political"), text(root, "headline"),
-                List.copyOf(claims), bool(root, "safety_tip"), List.copyOf(sources));
+                List.copyOf(claims), bool(root, "safety_tip"), List.copyOf(sources),
+                mode, bool(root, "high_risk"), List.copyOf(answerPoints));
+    }
+
+    // The strict schema only guarantees every field exists, not that the fields agree with the mode.
+    private static void checkConsistent(ReplyMode mode, Verdict overall, List<String> answerPoints) {
+        if ((mode == ReplyMode.FACT_CHECK) == (overall == Verdict.NOT_APPLICABLE)) {
+            throw new InvalidModelOutputException("verdict does not match mode " + mode);
+        }
+        if (mode == ReplyMode.ANSWER && answerPoints.isEmpty()) {
+            throw new InvalidModelOutputException("answer without points");
+        }
+    }
+
+    private static ReplyMode mode(JsonNode root) {
+        try {
+            return ReplyMode.valueOf(text(root, "mode"));
+        } catch (IllegalArgumentException e) {
+            throw new InvalidModelOutputException("unknown mode");
+        }
     }
 
     private static Verdict verdict(JsonNode node, String field) {

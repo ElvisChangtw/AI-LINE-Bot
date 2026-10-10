@@ -14,7 +14,7 @@ class CitationFilterTest {
     }
 
     private static FactCheckResult result(Verdict verdict, String... urls) {
-        return new FactCheckResult(verdict, false, "重點",
+        return FactCheckResult.factCheck(verdict, false, "重點",
                 List.of(new FactCheckResult.Claim("c", verdict, "理由")), false,
                 java.util.Arrays.stream(urls).map(CitationFilterTest::source).toList());
     }

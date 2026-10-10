@@ -27,7 +27,7 @@
       "content": [
         {
           "type": "output_text",
-          "text": "{\"overall_verdict\":\"INCORRECT\",\"political\":false,\"headline\":\"2021 年就在流傳的舊謠言\",\"claims\":[{\"text\":\"按 1 手機會被屏蔽\",\"verdict\":\"INCORRECT\",\"reason\":\"電話裡按 1 或按 2，不會讓手機被控制\"},{\"text\":\"疾管署打電話問接種\",\"verdict\":\"INCORRECT\",\"reason\":\"疾管署說，他們不會打電話問你有沒有打疫苗\"}],\"safety_tip\":true,\"sources\":[{\"url\":\"https://tfc-taiwan.org.tw/?p=108215\",\"title\":\"網傳按1手機被屏蔽\",\"publisher\":\"台灣事實查核中心\",\"published_date\":\"\"},{\"url\":\"https://example.com/made-up\",\"title\":\"不存在\",\"publisher\":\"假來源\",\"published_date\":\"\"}]}",
+          "text": "{\"mode\":\"FACT_CHECK\",\"overall_verdict\":\"INCORRECT\",\"political\":false,\"headline\":\"2021 年就在流傳的舊謠言\",\"claims\":[{\"text\":\"按 1 手機會被屏蔽\",\"verdict\":\"INCORRECT\",\"reason\":\"電話裡按 1 或按 2，不會讓手機被控制\"},{\"text\":\"疾管署打電話問接種\",\"verdict\":\"INCORRECT\",\"reason\":\"疾管署說，他們不會打電話問你有沒有打疫苗\"}],\"answer_points\":[],\"high_risk\":true,\"safety_tip\":true,\"sources\":[{\"url\":\"https://tfc-taiwan.org.tw/?p=108215\",\"title\":\"網傳按1手機被屏蔽\",\"publisher\":\"台灣事實查核中心\",\"published_date\":\"\"},{\"url\":\"https://example.com/made-up\",\"title\":\"不存在\",\"publisher\":\"假來源\",\"published_date\":\"\"}]}",
           "annotations": [
             { "type": "url_citation", "start_index": 0, "end_index": 10, "title": "Cofacts", "url": "https://www.mygopen.com/2021/09/vaccine-call.html" }
           ],

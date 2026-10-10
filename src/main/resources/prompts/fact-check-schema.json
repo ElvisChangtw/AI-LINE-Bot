@@ -1,13 +1,18 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["overall_verdict", "political", "headline", "claims", "safety_tip", "sources"],
+  "required": ["mode", "overall_verdict", "political", "high_risk", "headline", "claims", "answer_points", "safety_tip", "sources"],
   "properties": {
+    "mode": {
+      "type": "string",
+      "enum": ["FACT_CHECK", "ANSWER", "NEED_MATERIAL"]
+    },
     "overall_verdict": {
       "type": "string",
-      "enum": ["CORRECT", "INCORRECT", "PARTLY_CORRECT", "OUTDATED_OR_MISSING_CONDITIONS", "INSUFFICIENT_EVIDENCE", "OPINION"]
+      "enum": ["CORRECT", "INCORRECT", "PARTLY_CORRECT", "OUTDATED_OR_MISSING_CONDITIONS", "INSUFFICIENT_EVIDENCE", "OPINION", "NOT_APPLICABLE"]
     },
     "political": { "type": "boolean" },
+    "high_risk": { "type": "boolean" },
     "headline": { "type": "string" },
     "claims": {
       "type": "array",
@@ -24,6 +29,10 @@
           "reason": { "type": "string" }
         }
       }
+    },
+    "answer_points": {
+      "type": "array",
+      "items": { "type": "string" }
     },
     "safety_tip": { "type": "boolean" },
     "sources": {

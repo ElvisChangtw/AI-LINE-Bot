@@ -52,7 +52,7 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
     @Autowired
     FactCheckProperties props;
 
-    private static final FactCheckResult RESULT = new FactCheckResult(Verdict.INCORRECT, false, "舊謠言",
+    private static final FactCheckResult RESULT = FactCheckResult.factCheck(Verdict.INCORRECT, false, "舊謠言",
             List.of(new FactCheckResult.Claim("c", Verdict.INCORRECT, "按 1 不會讓手機被控制")), true,
             List.of(new FactCheckResult.Source("https://tfc-taiwan.org.tw/?p=108215", "t", "台灣事實查核中心", ""),
                     new FactCheckResult.Source("https://example.com/made-up", "t", "假", "")));
