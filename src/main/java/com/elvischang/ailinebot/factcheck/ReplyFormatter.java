@@ -16,8 +16,6 @@ public final class ReplyFormatter {
     private static final int MAX_ANSWER_LENGTH = 300;
     private static final int MAX_REASONS = 3;
     private static final int MAX_SOURCES = 2;
-    private static final String PREFIX = "【查證結果】";
-    private static final String ANSWER_PREFIX = "【回答】";
     private static final String BULLET = "・";
     private static final Pattern LINK = Pattern.compile("(https?://|www\\.)\\S+", Pattern.CASE_INSENSITIVE);
     private static final Map<Verdict, String> LABELS = new EnumMap<>(Map.of(
@@ -57,7 +55,7 @@ public final class ReplyFormatter {
         }
         // A high-risk answer may only go out with the source that backs it.
         int minSources = result.highRisk() ? 1 : 0;
-        return fit(ANSWER_PREFIX + headline, points, notes, sources(result), MAX_ANSWER_LENGTH, minSources);
+        return fit(headline, points, notes, sources(result), MAX_ANSWER_LENGTH, minSources);
     }
 
     private static List<String> bullets(List<String> modelTexts) {
@@ -78,7 +76,7 @@ public final class ReplyFormatter {
 
     private static String factCheck(FactCheckResult result, boolean materialHasLink) {
         String headline = withoutLinks(result.headline());
-        String header = PREFIX + LABELS.get(result.overall()) + (headline.isEmpty() ? "" : "，" + headline);
+        String header = LABELS.get(result.overall()) + (headline.isEmpty() ? "" : "，" + headline);
         List<String> reasons = new ArrayList<>(bullets(result.claims().stream().map(FactCheckResult.Claim::reason).toList()));
         if (reasons.isEmpty() && result.overall() == Verdict.INSUFFICIENT_EVIDENCE) {
             reasons.add(BULLET + BotReplies.NOTHING_RELIABLE_FOUND);
@@ -142,7 +140,9 @@ public final class ReplyFormatter {
 
     private static String join(String header, List<String> reasons, List<String> notes, List<String> sources) {
         List<String> lines = new ArrayList<>();
-        lines.add(header);
+        if (!header.isEmpty()) {
+            lines.add(header);
+        }
         lines.addAll(reasons);
         lines.addAll(notes);
         lines.addAll(sources);

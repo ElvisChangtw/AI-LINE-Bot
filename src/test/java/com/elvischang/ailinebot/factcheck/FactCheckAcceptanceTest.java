@@ -29,7 +29,7 @@ class FactCheckAcceptanceTest extends IntegrationTestSupport {
     private static final String RESPONSES = "/v1/responses";
 
     private static final String EXPECTED_VACCINE_REPLY = """
-            【查證結果】這是假消息，2021 年就在流傳的舊謠言
+            這是假消息，2021 年就在流傳的舊謠言
             ・電話裡按 1 或按 2，不會讓手機被控制
             ・疾管署說，他們不會打電話問你有沒有打疫苗
             不要點連結、不要給驗證碼和帳號密碼，不放心可以打 165 問

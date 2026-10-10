@@ -22,7 +22,7 @@ class ReplyFormatterTest {
     @Test
     void formatsTheVaccineRumourLikeTheSpecExample() {
         assertThat(ReplyFormatter.format(vaccine(false), false)).isEqualTo("""
-                【查證結果】這是假消息，2021 年就在流傳的舊謠言
+                這是假消息，2021 年就在流傳的舊謠言
                 ・電話裡按 1 或按 2，不會讓手機被控制
                 ・疾管署說，他們不會打電話問你有沒有打疫苗
                 不要點連結、不要給驗證碼和帳號密碼，不放心可以打 165 問
@@ -43,7 +43,7 @@ class ReplyFormatterTest {
                 List.of(new FactCheckResult.Source("https://www.gov.tw/a", "t", "", "2026-09-15")));
 
         assertThat(ReplyFormatter.format(correct, true)).isEqualTo("""
-                【查證結果】內容正確
+                內容正確
                 ・確實有這項補助
                 （我沒有打開訊息裡的連結）
                 來源：gov.tw（2026-09-15）
@@ -71,7 +71,7 @@ class ReplyFormatterTest {
     void insufficientEvidenceSaysSoPlainly() {
         FactCheckResult nothing = FactCheckResult.factCheck(Verdict.INSUFFICIENT_EVIDENCE, false, "", List.of(), false, List.of());
         assertThat(ReplyFormatter.format(nothing, false))
-                .isEqualTo("【查證結果】查不到足夠資料，還不能確定\n・" + BotReplies.NOTHING_RELIABLE_FOUND);
+                .isEqualTo("查不到足夠資料，還不能確定\n・" + BotReplies.NOTHING_RELIABLE_FOUND);
     }
 
     @Test
@@ -86,7 +86,7 @@ class ReplyFormatterTest {
         String text = ReplyFormatter.format(verbose, false);
 
         assertThat(text.length()).isLessThanOrEqualTo(500);
-        assertThat(text).startsWith("【查證結果】部分正確，重點\n・");
+        assertThat(text).startsWith("部分正確，重點\n・");
     }
 
     private static final FactCheckResult.Source CWA =
@@ -101,7 +101,7 @@ class ReplyFormatterTest {
     void formatsAnAnswerLikeTheSpecExample() {
         assertThat(ReplyFormatter.format(answer(true, List.of("降雨機率 70%，出門前看一下天色"), List.of(CWA)), false))
                 .isEqualTo("""
-                        【回答】明天台北會下雨，傘記得帶
+                        明天台北會下雨，傘記得帶
                         ・降雨機率 70%，出門前看一下天色
                         來源：中央氣象署
                         https://www.cwa.gov.tw/V8/C/W/County/County.html?CID=63""");
@@ -116,7 +116,7 @@ class ReplyFormatterTest {
     @Test
     void aLowRiskAnswerWithoutSourcesIsSentAsIs() {
         assertThat(ReplyFormatter.format(answer(false, List.of("滷肉先炒糖色再下醬油"), List.of()), true))
-                .isEqualTo("【回答】明天台北會下雨，傘記得帶\n・滷肉先炒糖色再下醬油\n" + BotReplies.LINK_NOT_OPENED);
+                .isEqualTo("明天台北會下雨，傘記得帶\n・滷肉先炒糖色再下醬油\n" + BotReplies.LINK_NOT_OPENED);
     }
 
     @Test
@@ -151,7 +151,7 @@ class ReplyFormatterTest {
     void anAnswerWhoseWordsWereAllLinksSaysNothingReliableWasFound() {
         FactCheckResult allLinks = new FactCheckResult(Verdict.NOT_APPLICABLE, false, "https://evil.example", List.of(), false,
                 List.of(), ReplyMode.ANSWER, false, List.of("www.evil.example"));
-        assertThat(ReplyFormatter.format(allLinks, false)).isEqualTo("【回答】\n・" + BotReplies.NOTHING_RELIABLE_FOUND);
+        assertThat(ReplyFormatter.format(allLinks, false)).isEqualTo("・" + BotReplies.NOTHING_RELIABLE_FOUND);
     }
 
     @Test
@@ -160,7 +160,7 @@ class ReplyFormatterTest {
         String text = ReplyFormatter.format(answer(false, List.of(longPoint, longPoint), List.of(CWA, CWA)), false);
 
         assertThat(text.length()).isLessThanOrEqualTo(300);
-        assertThat(text).startsWith("【回答】明天台北會下雨，傘記得帶\n・");
+        assertThat(text).startsWith("明天台北會下雨，傘記得帶\n・");
     }
 
     @Test
