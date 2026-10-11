@@ -19,5 +19,6 @@ public record Job(
         Long waitingSince,
         String errorCode,
         long createdAt,
-        Long finishedAt) {
+        Long finishedAt,
+        String about) {
 }

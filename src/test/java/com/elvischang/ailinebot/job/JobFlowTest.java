@@ -131,8 +131,40 @@ class JobFlowTest extends IntegrationTestSupport {
         awaitSendState("102", SendState.REPLIED);
 
         assertThat(factChecks.calls()).containsExactly("99", "900", RecordingFactCheckService.QUESTION_ONLY, "900");
-        assertThat(factChecks.materialTexts()).containsExactly("轉傳的訊息",
-                RecentMaterialPicker.EARLIER_BOT_REPLY + "TEST RESULT 99", RecentMaterialPicker.EARLIER_BOT_REPLY + "TEST RESULT 99");
+        String followUp = RecentMaterialPicker.asFollowUp("轉傳的訊息", "TEST RESULT 99");
+        assertThat(factChecks.materialTexts()).containsExactly("轉傳的訊息", followUp, followUp);
+    }
+
+    @Test
+    void aLongerDiscussionKeepsTheOriginalMessageWithoutNesting() throws Exception {
+        stubReplyOk("900");
+        postWebhook(body(groupText("e1", "Cg1", "99", "喝檸檬水可以治癌症")));
+        postWebhook(body(groupMention("e2", "Cg1", "100", "", "99")));
+        awaitSendState("100", SendState.REPLIED);
+        stubReplyOk("901");
+        postWebhook(body(groupMention("e3", "Cg1", "101", "為什麼", "900")));
+        awaitSendState("101", SendState.REPLIED);
+        stubReplyOk("902");
+        postWebhook(body(groupMention("e4", "Cg1", "102", "來源呢", "901")));
+        awaitSendState("102", SendState.REPLIED);
+
+        assertThat(factChecks.materialTexts()).containsExactly("喝檸檬水可以治癌症",
+                RecentMaterialPicker.asFollowUp("喝檸檬水可以治癌症", "TEST RESULT 99"),
+                RecentMaterialPicker.asFollowUp("喝檸檬水可以治癌症", "TEST RESULT 900"));
+        assertThat(jdbc.sql("SELECT about FROM material WHERE message_id = '902'").query(String.class).single())
+                .isEqualTo("喝檸檬水可以治癌症");
+    }
+
+    @Test
+    void aFollowUpOnAPlainAnswerRemembersTheQuestion() throws Exception {
+        stubReplyOk("900");
+        postWebhook(body(groupMention("e1", "Cg1", "100", "明天台北會下雨嗎", null)));
+        awaitSendState("100", SendState.REPLIED);
+        postWebhook(body(groupMention("e2", "Cg1", "101", "那後天呢", "900")));
+        awaitSendState("101", SendState.REPLIED);
+
+        assertThat(factChecks.materialTexts()).containsExactly(
+                RecentMaterialPicker.asFollowUp("明天台北會下雨嗎", "TEST RESULT question"));
     }
 
     @Test

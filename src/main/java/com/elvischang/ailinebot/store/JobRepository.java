@@ -36,7 +36,8 @@ public class JobRepository {
             nullableLong(rs, "waiting_since"),
             rs.getString("error_code"),
             rs.getLong("created_at"),
-            nullableLong(rs, "finished_at"));
+            nullableLong(rs, "finished_at"),
+            rs.getString("about"));
 
     private final JdbcClient jdbc;
 
@@ -256,12 +257,15 @@ public class JobRepository {
                 .update();
     }
 
-    public void recordFactCheck(String id, int attempt, Verdict verdict, ReplyMode mode, Usage usage, long costMicroUsd) {
+    public void recordFactCheck(String id, int attempt, Verdict verdict, ReplyMode mode, Usage usage, long costMicroUsd,
+                                String about) {
         jdbc.sql("""
                         UPDATE job SET verdict = :verdict, mode = :mode, input_tokens = :in, output_tokens = :out,
-                                       search_calls = :searches, cost_micro_usd = COALESCE(cost_micro_usd, 0) + :cost
+                                       search_calls = :searches, cost_micro_usd = COALESCE(cost_micro_usd, 0) + :cost,
+                                       about = :about
                         WHERE id = :id AND status = 'RUNNING' AND attempts = :attempt
                         """)
+                .param("about", about)
                 .param("verdict", verdict == null ? null : verdict.name())
                 .param("mode", mode == null ? null : mode.name())
                 .param("in", usage.inputTokens())

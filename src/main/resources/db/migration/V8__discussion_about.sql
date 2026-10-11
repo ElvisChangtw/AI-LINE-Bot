@@ -1,0 +1,2 @@
+ALTER TABLE job ADD COLUMN about TEXT;
+ALTER TABLE material ADD COLUMN about TEXT;

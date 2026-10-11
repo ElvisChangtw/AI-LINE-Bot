@@ -39,14 +39,23 @@ public class MaterialRepository {
     }
 
     public void insert(Material m, String senderId, Long mediaDurationMs) {
+        insert(m, senderId, mediaDurationMs, null);
+    }
+
+    public void insertBotReply(Material m, String about) {
+        insert(m, null, null, about);
+    }
+
+    private void insert(Material m, String senderId, Long mediaDurationMs, String about) {
         jdbc.sql("""
                         INSERT OR IGNORE INTO material(group_id, message_id, kind, text, is_bot_trigger, media_status,
                                                        media_sha256, media_attempts, created_at, expires_at, sender_id,
-                                                       media_duration_ms)
+                                                       media_duration_ms, about)
                         VALUES (:groupId, :messageId, :kind, :text, :botTrigger, :mediaStatus,
-                                :sha, :attempts, :createdAt, :expiresAt, :sender, :duration)
+                                :sha, :attempts, :createdAt, :expiresAt, :sender, :duration, :about)
                         """)
                 .param("sender", senderId)
+                .param("about", about)
                 .param("duration", mediaDurationMs)
                 .param("groupId", m.groupId())
                 .param("messageId", m.messageId())
@@ -66,6 +75,14 @@ public class MaterialRepository {
                 .param("g", groupId)
                 .param("m", messageId)
                 .query(MAPPER)
+                .optional();
+    }
+
+    public Optional<String> about(String groupId, String messageId) {
+        return jdbc.sql("SELECT about FROM material WHERE group_id = :g AND message_id = :m AND about IS NOT NULL")
+                .param("g", groupId)
+                .param("m", messageId)
+                .query(String.class)
                 .optional();
     }
 

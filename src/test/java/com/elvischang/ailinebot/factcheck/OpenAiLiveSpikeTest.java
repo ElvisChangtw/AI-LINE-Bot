@@ -13,7 +13,7 @@ class OpenAiLiveSpikeTest {
 
     static FactCheckProperties liveProps(String model) {
         return new FactCheckProperties("https://api.openai.com/v1", System.getenv("OPENAI_API_KEY"), model, "medium", 3,
-                Duration.ofSeconds(40), 100_000, 500_000, 10_000, 2_000_000, 40_000_000, Duration.ofHours(24), "v8");
+                Duration.ofSeconds(40), 100_000, 500_000, 10_000, 2_000_000, 40_000_000, Duration.ofHours(24), "v9");
     }
 
     @Test
@@ -68,5 +68,20 @@ class OpenAiLiveSpikeTest {
 
         System.out.println("video verdict=" + check.result().overall() + " headline=" + check.result().headline());
         assertThat(check.result().overall()).isEqualTo(Verdict.INCORRECT);
+    }
+    @Test
+    void answersAFollowUpInTheContextOfTheOriginalMessage() {
+        FactCheckProperties props = liveProps("gpt-6-luna");
+        OpenAiResponsesFactChecker checker = new OpenAiResponsesFactChecker(props, new FactCheckPrompt(props),
+                org.mockito.Mockito.mock(SpendRepository.class), java.time.Clock.systemUTC());
+        String material = com.elvischang.ailinebot.material.RecentMaterialPicker.asFollowUp(
+                "每天早上空腹喝一杯熱檸檬水，可以殺死癌細胞，請轉發給你關心的人",
+                "這個說法不對喔 ❌ 熱檸檬水不能殺死癌細胞，目前沒有研究證實。");
+
+        ModelCheck check = checker.check(new FactCheckInput(material, null, null, "那喝冷的檸檬水呢？", LocalDate.now()));
+
+        System.out.println("follow-up mode=" + check.result().mode() + " points=" + check.result().answerPoints());
+        assertThat(check.result().mode()).isEqualTo(ReplyMode.ANSWER);
+        assertThat(String.join("", check.result().answerPoints())).contains("癌");
     }
 }

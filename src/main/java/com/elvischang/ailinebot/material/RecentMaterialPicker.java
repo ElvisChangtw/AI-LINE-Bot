@@ -20,6 +20,8 @@ public class RecentMaterialPicker {
     static final Duration SAME_SENDER_GAP = Duration.ofMinutes(2);
     // Tells the model the material is its own earlier answer, so it explains or corrects itself.
     public static final String EARLIER_BOT_REPLY = "（這是 AskBot 之前在群組的回覆，家人在追問它）\n";
+    static final String ORIGINAL_TOPIC = "原本在討論的內容：\n";
+    static final String LATEST_BOT_REPLY = "AskBot 剛才的回覆：\n";
 
     private final MaterialRepository materials;
     private final BotProperties props;
@@ -37,9 +39,16 @@ public class RecentMaterialPicker {
         return latestRun(materials.recentCandidates(groupId, since, triggerAt, triggerMessageId, includeBotReplies));
     }
 
-    public static Material asFollowUp(Material botReply) {
-        return new Material(botReply.groupId(), botReply.messageId(), MaterialKind.TEXT, EARLIER_BOT_REPLY + botReply.text(),
+    public static Material asFollowUp(Material botReply, String about) {
+        return new Material(botReply.groupId(), botReply.messageId(), MaterialKind.TEXT, asFollowUp(about, botReply.text()),
                 false, botReply.mediaStatus(), null, 0, botReply.createdAt(), botReply.expiresAt());
+    }
+
+    public static String asFollowUp(String about, String botReplyText) {
+        if (about == null) {
+            return EARLIER_BOT_REPLY + botReplyText;
+        }
+        return EARLIER_BOT_REPLY + ORIGINAL_TOPIC + about + "\n\n" + LATEST_BOT_REPLY + botReplyText;
     }
 
     static Optional<Picked> latestRun(List<RecentMessage> newestFirst) {
@@ -48,7 +57,7 @@ public class RecentMaterialPicker {
         }
         RecentMessage latest = newestFirst.getFirst();
         if (latest.material().kind() == MaterialKind.BOT_REPLY) {
-            return Optional.of(new Picked(asFollowUp(latest.material()), null, true));
+            return Optional.of(new Picked(latest.material(), null, true));
         }
         if (latest.material().kind() != MaterialKind.TEXT) {
             return Optional.of(new Picked(latest.material(), latest.senderId(), false));

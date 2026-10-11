@@ -185,9 +185,9 @@ class JobRepositoryTest extends IntegrationTestSupport {
         String id = jobs.insert(new NewJob(JobKind.FACT_CHECK, "Cg1", "t", "m", "q", "rt", "qt", null), 100);
         jobs.claim(id, 100, 1000);
         jobs.recordFactCheck(id, 1, com.elvischang.ailinebot.factcheck.Verdict.INCORRECT,
-                com.elvischang.ailinebot.factcheck.ReplyMode.FACT_CHECK, new com.elvischang.ailinebot.factcheck.Usage(10, 20, 3), 500);
+                com.elvischang.ailinebot.factcheck.ReplyMode.FACT_CHECK, new com.elvischang.ailinebot.factcheck.Usage(10, 20, 3), 500, null);
         jobs.recordFactCheck(id, 2, com.elvischang.ailinebot.factcheck.Verdict.CORRECT,
-                com.elvischang.ailinebot.factcheck.ReplyMode.ANSWER, new com.elvischang.ailinebot.factcheck.Usage(1, 1, 1), 999);
+                com.elvischang.ailinebot.factcheck.ReplyMode.ANSWER, new com.elvischang.ailinebot.factcheck.Usage(1, 1, 1), 999, null);
 
         assertThat(jdbc.sql("SELECT verdict, input_tokens, output_tokens, search_calls, cost_micro_usd, mode FROM job WHERE id = :id")
                 .param("id", id).query((rs, n) -> rs.getString(1) + "/" + rs.getLong(2) + "/" + rs.getLong(3)

@@ -30,6 +30,8 @@ import java.util.Optional;
 public class JobRunner {
 
     private static final Logger log = LoggerFactory.getLogger(JobRunner.class);
+    private static final int MAX_ABOUT_CHARS = 2000;
+    private static final String IMAGE_ABOUT = "（一張圖片）";
 
     private final JobRepository jobs;
     private final MaterialRepository materials;
@@ -111,14 +113,14 @@ public class JobRunner {
         if (!question.isBlank()) {
             firstPass = factCheckService.verify(job.groupId(), null, question);
             if (firstPass.mode() != ReplyMode.NEED_MATERIAL) {
-                return recorded(job, firstPass);
+                return recorded(job, firstPass, question);
             }
         }
         // Only a real question can be about our own last answer; a bare "is this true" means the message above.
         Optional<RecentMaterialPicker.Picked> picked = picker.pick(job.groupId(), job.triggerMessageId(), job.createdAt(),
                 firstPass != null);
         if (picked.isEmpty()) {
-            return firstPass == null ? BotReplies.ASK_TO_QUOTE : recorded(job, firstPass);
+            return firstPass == null ? BotReplies.ASK_TO_QUOTE : recorded(job, firstPass, question);
         }
         return lookedBack(job, picked.get(), question);
     }
@@ -150,7 +152,13 @@ public class JobRunner {
 
     // Voice and video are transcribed first; anything that cannot be checked gets a plain notice.
     private String checkMaterial(Job job, Material material, String question) {
-        Material target = material.kind() == MaterialKind.BOT_REPLY ? RecentMaterialPicker.asFollowUp(material) : material;
+        if (material.kind() == MaterialKind.BOT_REPLY) {
+            // A follow-up keeps pointing at what the discussion started from, so it never grows turn by turn.
+            String about = materials.about(material.groupId(), material.messageId()).orElse(null);
+            Material target = RecentMaterialPicker.asFollowUp(material, about);
+            return recorded(job, factCheckService.verify(job.groupId(), target, question), about == null ? material.text() : about);
+        }
+        Material target = material;
         if (material.kind() == MaterialKind.AUDIO || material.kind() == MaterialKind.VIDEO) {
             MediaTranscriber.Prepared prepared;
             try {
@@ -178,14 +186,17 @@ public class JobRunner {
                 }
             }
         }
-        return recorded(job, factCheckService.verify(job.groupId(), target, question));
+        String about = target.text() == null ? IMAGE_ABOUT : target.text();
+        return recorded(job, factCheckService.verify(job.groupId(), target, question), about);
     }
 
-    private String recorded(Job job, FactCheckReply reply) {
+    private String recorded(Job job, FactCheckReply reply, String about) {
         if (reply.text() == null || reply.text().isBlank()) {
             throw new IllegalStateException("fact check produced no reply");
         }
-        jobs.recordFactCheck(job.id(), job.attempts(), reply.verdict(), reply.mode(), reply.usage(), reply.costMicroUsd());
+        String capped = about == null || about.codePointCount(0, about.length()) <= MAX_ABOUT_CHARS
+                ? about : about.substring(0, about.offsetByCodePoints(0, MAX_ABOUT_CHARS));
+        jobs.recordFactCheck(job.id(), job.attempts(), reply.verdict(), reply.mode(), reply.usage(), reply.costMicroUsd(), capped);
         return reply.text();
     }
 
