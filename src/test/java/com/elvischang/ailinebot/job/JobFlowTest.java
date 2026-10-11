@@ -113,7 +113,7 @@ class JobFlowTest extends IntegrationTestSupport {
         assertThat(factChecks.calls()).containsExactly(RecordingFactCheckService.QUESTION_ONLY, "99");
         assertThat(factChecks.materialTexts()).containsExactly("健保署公告\n看到不要點");
         LINE.verify(postRequestedFor(urlEqualTo(REPLY))
-                .withRequestBody(matchingJsonPath("$.messages[0].text", containing("（我看的是 媽媽 ")))
+                .withRequestBody(matchingJsonPath("$.messages[0].text", containing("（我猜你問的是 媽媽 ")))
                 .withRequestBody(matchingJsonPath("$.messages[0].text", containing("傳的「健保署公告 看到不要點」")))
                 .withRequestBody(matchingJsonPath("$.messages[0].text", containing("TEST RESULT 99"))));
     }

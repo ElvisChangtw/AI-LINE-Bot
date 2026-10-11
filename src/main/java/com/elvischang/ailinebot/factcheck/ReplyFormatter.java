@@ -21,12 +21,12 @@ public final class ReplyFormatter {
     // Models sometimes inline citations as "([site](url))"; drop the whole thing, not just the url.
     private static final Pattern MARKDOWN_LINK = Pattern.compile("\\(?\\[[^\\]]*]\\([^)\\s]*\\)\\)?");
     private static final Map<Verdict, String> LABELS = new EnumMap<>(Map.of(
-            Verdict.CORRECT, "內容正確",
-            Verdict.INCORRECT, "這是假消息",
-            Verdict.PARTLY_CORRECT, "部分正確",
-            Verdict.OUTDATED_OR_MISSING_CONDITIONS, "過期了，或少了重要條件",
-            Verdict.INSUFFICIENT_EVIDENCE, "查不到足夠資料，還不能確定",
-            Verdict.OPINION, "這是看法，不是能查對錯的事"));
+            Verdict.CORRECT, "這是真的",
+            Verdict.INCORRECT, "這是假的喔",
+            Verdict.PARTLY_CORRECT, "說對了一部分",
+            Verdict.OUTDATED_OR_MISSING_CONDITIONS, "這是舊消息，或少講了重要的條件",
+            Verdict.INSUFFICIENT_EVIDENCE, "這個我查不太到，還不敢說對不對",
+            Verdict.OPINION, "這是個人看法，沒有標準答案喔"));
 
     private ReplyFormatter() {
     }

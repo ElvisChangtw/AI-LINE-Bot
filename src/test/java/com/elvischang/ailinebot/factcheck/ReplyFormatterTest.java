@@ -22,10 +22,10 @@ class ReplyFormatterTest {
     @Test
     void formatsTheVaccineRumourLikeTheSpecExample() {
         assertThat(ReplyFormatter.format(vaccine(false), false)).isEqualTo("""
-                這是假消息，2021 年就在流傳的舊謠言
+                這是假的喔，2021 年就在流傳的舊謠言
                 ・電話裡按 1 或按 2，不會讓手機被控制
                 ・疾管署說，他們不會打電話問你有沒有打疫苗
-                不要點連結、不要給驗證碼和帳號密碼，不放心可以打 165 問
+                連結先別點，驗證碼和帳號密碼也不要給人，不放心就打 165 問問
                 不用擔心，這則可以不用再轉傳囉
                 來源：台灣事實查核中心
                 https://tfc-taiwan.org.tw/?p=108215""");
@@ -43,9 +43,9 @@ class ReplyFormatterTest {
                 List.of(new FactCheckResult.Source("https://www.gov.tw/a", "t", "", "2026-09-15")));
 
         assertThat(ReplyFormatter.format(correct, true)).isEqualTo("""
-                內容正確
+                這是真的
                 ・確實有這項補助
-                （我沒有打開訊息裡的連結）
+                （訊息裡的連結我沒有點開）
                 來源：gov.tw（2026-09-15）
                 https://www.gov.tw/a""");
     }
@@ -71,7 +71,7 @@ class ReplyFormatterTest {
     void insufficientEvidenceSaysSoPlainly() {
         FactCheckResult nothing = FactCheckResult.factCheck(Verdict.INSUFFICIENT_EVIDENCE, false, "", List.of(), false, List.of());
         assertThat(ReplyFormatter.format(nothing, false))
-                .isEqualTo("查不到足夠資料，還不能確定\n・" + BotReplies.NOTHING_RELIABLE_FOUND);
+                .isEqualTo("這個我查不太到，還不敢說對不對\n・" + BotReplies.NOTHING_RELIABLE_FOUND);
     }
 
     @Test
@@ -86,7 +86,7 @@ class ReplyFormatterTest {
         String text = ReplyFormatter.format(verbose, false);
 
         assertThat(text.length()).isLessThanOrEqualTo(500);
-        assertThat(text).startsWith("部分正確，重點\n・");
+        assertThat(text).startsWith("說對了一部分，重點\n・");
     }
 
     private static final FactCheckResult.Source CWA =

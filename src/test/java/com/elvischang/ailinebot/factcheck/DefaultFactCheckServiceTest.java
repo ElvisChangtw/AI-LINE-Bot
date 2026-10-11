@@ -86,7 +86,7 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
         FactCheckReply first = ask(text("Cg1", "1", "按1 手機被屏蔽 https://x.example"), "真的嗎");
         FactCheckReply second = ask(text("Cg2", "2", "按1\u3000手機被屏蔽 https://x.example"), " 真的嗎\u3000");
 
-        assertThat(first.text()).startsWith("這是假消息，舊謠言")
+        assertThat(first.text()).startsWith("這是假的喔，舊謠言")
                 .contains(BotReplies.LINK_NOT_OPENED)
                 .contains("https://tfc-taiwan.org.tw/?p=108215")
                 .doesNotContain("example.com/made-up");
