@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -100,6 +101,15 @@ class YouTubeWatcherTest {
     }
 
     @Test
+    void anOverloadedGeminiIsNotRememberedSoTheNextAskWatchesAgain() {
+        gemini.stubFor(post(urlEqualTo(PATH)).willReturn(aResponse().withStatus(503)));
+
+        assertThat(watcher("k").summary("dQw4w9WgXcQ")).isEmpty();
+
+        verify(summaries, never()).save(anyString(), anyString(), anyLong(), anyLong());
+    }
+
+    @Test
     void staysOffOverBudgetOrWhenGeminiCannotWatch() {
         assertThat(watcher(" ").summary("dQw4w9WgXcQ")).isEmpty();
         assertThat(gemini.getAllServeEvents()).isEmpty();
@@ -120,7 +130,7 @@ class YouTubeWatcherTest {
         assertThat(watcher("k").summary("dQw4w9WgXcQ")).isEmpty();
 
         assertThat(gemini.getAllServeEvents()).hasSize(4);
-        verify(summaries, times(4)).save("dQw4w9WgXcQ", "", NOW, TTL_START);
+        verify(summaries, times(3)).save("dQw4w9WgXcQ", "", NOW, TTL_START);
         long estimate = 600L * 100 * 300_000 / 1_000_000 + 4096L * 2_500_000 / 1_000_000;
         verify(spending, times(2)).record(NOW, estimate);
     }

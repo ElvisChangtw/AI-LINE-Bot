@@ -82,38 +82,48 @@ public class YouTubeWatcher {
             log.info("youtube refused reason=budget");
             return Optional.empty();
         }
-        Optional<String> watched = watch(videoId);
+        Attempt attempt = watch(videoId);
         // A failure is remembered briefly too, so a video Gemini cannot watch is not paid for on every ask.
-        summaries.save(videoId, watched.orElse(""), clock.millis(), now - props.summaryTtl().toMillis());
-        return watched;
+        if (attempt.remember()) {
+            summaries.save(videoId, attempt.summary().orElse(""), clock.millis(), now - props.summaryTtl().toMillis());
+        }
+        return attempt.summary();
     }
 
-    private Optional<String> watch(String videoId) {
+    // An overloaded Gemini says nothing about the video, so it is not remembered as one Gemini cannot watch.
+    private record Attempt(Optional<String> summary, boolean remember) {
+        static Attempt of(Optional<String> summary) {
+            return new Attempt(summary, true);
+        }
+    }
+
+    private Attempt watch(String videoId) {
         HttpResponse<String> response;
         try {
             response = http.send(request(videoId), HttpResponse.BodyHandlers.ofString());
         } catch (IOException e) {
             spending.record(clock.millis(), estimatedCostMicroUsd());
             log.warn("youtube watch failed cause={}", e.getClass().getSimpleName());
-            return Optional.empty();
+            return Attempt.of(Optional.empty());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return Optional.empty();
+            return Attempt.of(Optional.empty());
         }
         if (response.statusCode() / 100 != 2) {
-            if (response.statusCode() >= FIRST_SERVER_ERROR_STATUS) {
+            boolean serverError = response.statusCode() >= FIRST_SERVER_ERROR_STATUS;
+            if (serverError) {
                 spending.record(clock.millis(), estimatedCostMicroUsd());
             }
             log.warn("youtube watch refused status={}", response.statusCode());
-            return Optional.empty();
+            return new Attempt(Optional.empty(), !serverError);
         }
         try {
             JsonNode root = mapper.readTree(response.body());
             recordSpend(root.path("usageMetadata"));
-            return text(root);
+            return Attempt.of(text(root));
         } catch (IOException e) {
             log.warn("youtube watch unreadable cause={}", e.getClass().getSimpleName());
-            return Optional.empty();
+            return Attempt.of(Optional.empty());
         }
     }
 
