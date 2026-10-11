@@ -27,7 +27,9 @@ public final class CitationFilter {
                 .filter(source -> consulted.contains(normalize(source.url())))
                 .toList();
         // Answers without sources are handled by ReplyFormatter according to their risk.
-        if (kept.isEmpty() && result.mode() == ReplyMode.FACT_CHECK && result.overall() != Verdict.OPINION) {
+        // An insufficient answer claims nothing, so its reason (e.g. the video could not be watched) must survive.
+        if (kept.isEmpty() && result.mode() == ReplyMode.FACT_CHECK && result.overall() != Verdict.OPINION
+                && result.overall() != Verdict.INSUFFICIENT_EVIDENCE) {
             return result.downgradedToInsufficient();
         }
         return result.withSources(kept);

@@ -295,6 +295,19 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
     }
 
     @Test
+    void anUnsourcedInsufficientAnswerKeepsItsReasonSoTheGroupLearnsTheVideoWasNotWatched() {
+        when(youTube.summary("EvU4PxdM0pI")).thenReturn(java.util.Optional.empty());
+        FactCheckResult unwatched = FactCheckResult.factCheck(Verdict.INSUFFICIENT_EVIDENCE, false, "",
+                List.of(new FactCheckResult.Claim("c", Verdict.INSUFFICIENT_EVIDENCE, "看不到影片內容，搜尋也找不到相關報導")), false,
+                List.of());
+        when(checker.check(any())).thenReturn(new ModelCheck(unwatched, Set.of(), new Usage(1_000, 100, 2)));
+
+        FactCheckReply reply = ask(text("Cg1", "1", "https://www.youtube.com/watch?v=EvU4PxdM0pI"), "合理嗎");
+
+        assertThat(reply.text()).contains("看不到影片內容").doesNotContain(BotReplies.NOTHING_RELIABLE_FOUND);
+    }
+
+    @Test
     void answersAndRequestsForMaterialAreNeverCached() {
         when(checker.check(any())).thenReturn(answer(ReplyMode.ANSWER), answer(ReplyMode.ANSWER),
                 answer(ReplyMode.NEED_MATERIAL), answer(ReplyMode.NEED_MATERIAL));
