@@ -51,6 +51,18 @@ public class RecentMaterialPicker {
         return EARLIER_BOT_REPLY + ORIGINAL_TOPIC + about + "\n\n" + LATEST_BOT_REPLY + botReplyText;
     }
 
+    // The message the model pointed at, merged with the same sender's bubbles just before it.
+    public static Optional<Picked> at(List<RecentMessage> oldestFirst, RecentMessage target) {
+        int index = oldestFirst.indexOf(target);
+        if (index < 0 || target.material().botTrigger()) {
+            return Optional.empty();
+        }
+        List<RecentMessage> upToTarget = oldestFirst.subList(0, index + 1).stream()
+                .filter(m -> !m.material().botTrigger())
+                .toList();
+        return latestRun(upToTarget.reversed());
+    }
+
     static Optional<Picked> latestRun(List<RecentMessage> newestFirst) {
         if (newestFirst.isEmpty()) {
             return Optional.empty();

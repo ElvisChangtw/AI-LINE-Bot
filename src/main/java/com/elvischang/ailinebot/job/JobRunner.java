@@ -11,6 +11,7 @@ import com.elvischang.ailinebot.factcheck.ReplyMode;
 import com.elvischang.ailinebot.line.Hashes;
 import com.elvischang.ailinebot.line.SenderNames;
 import com.elvischang.ailinebot.material.Questions;
+import com.elvischang.ailinebot.material.RecentConversation;
 import com.elvischang.ailinebot.media.MediaTranscriber;
 import com.elvischang.ailinebot.material.RecentMaterialPicker;
 import com.elvischang.ailinebot.service.ImageGenerationService;
@@ -36,6 +37,7 @@ public class JobRunner {
     private final JobRepository jobs;
     private final MaterialRepository materials;
     private final RecentMaterialPicker picker;
+    private final RecentConversation conversation;
     private final SenderNames senderNames;
     private final MediaTranscriber transcriber;
     private final FactCheckService factCheckService;
@@ -44,13 +46,15 @@ public class JobRunner {
     private final BotProperties props;
     private final Clock clock;
 
-    public JobRunner(JobRepository jobs, MaterialRepository materials, RecentMaterialPicker picker, SenderNames senderNames,
+    public JobRunner(JobRepository jobs, MaterialRepository materials, RecentMaterialPicker picker,
+                     RecentConversation conversation, SenderNames senderNames,
                      MediaTranscriber transcriber, FactCheckService factCheckService,
                      ImageGenerationService imageGenerationService, ReplySender replySender,
                      BotProperties props, Clock clock) {
         this.jobs = jobs;
         this.materials = materials;
         this.picker = picker;
+        this.conversation = conversation;
         this.senderNames = senderNames;
         this.transcriber = transcriber;
         this.factCheckService = factCheckService;
@@ -102,34 +106,38 @@ public class JobRunner {
 
     private String factCheck(Job job) {
         String question = Questions.normalize(job.userQuestion());
+        RecentConversation.Snapshot chat = conversation.of(job.groupId(), job.triggerMessageId(), job.createdAt());
         if (job.materialMessageId() != null) {
             Optional<Material> found = materials.find(job.groupId(), job.materialMessageId());
             if (found.isEmpty()) {
                 return BotReplies.QUOTE_NOT_FOUND;
             }
-            return checkMaterial(job, found.get(), question);
+            return checkMaterial(job, found.get(), question, chat);
         }
         FactCheckReply firstPass = null;
         if (!question.isBlank()) {
-            firstPass = factCheckService.verify(job.groupId(), null, question);
+            firstPass = factCheckService.verify(job.groupId(), null, question, chat.text());
             if (firstPass.mode() != ReplyMode.NEED_MATERIAL) {
                 return recorded(job, firstPass, question);
             }
         }
-        // Only a real question can be about our own last answer; a bare "is this true" means the message above.
-        Optional<RecentMaterialPicker.Picked> picked = picker.pick(job.groupId(), job.triggerMessageId(), job.createdAt(),
-                firstPass != null);
+        Optional<RecentMaterialPicker.Picked> picked = chat.message(firstPass == null ? null : firstPass.targetMessage())
+                .flatMap(target -> RecentMaterialPicker.at(chat.messages(), target));
+        if (picked.isEmpty()) {
+            // Only a real question can be about our own last answer; a bare "is this true" means the message above.
+            picked = picker.pick(job.groupId(), job.triggerMessageId(), job.createdAt(), firstPass != null);
+        }
         if (picked.isEmpty()) {
             return firstPass == null ? BotReplies.ASK_TO_QUOTE : recorded(job, firstPass, question);
         }
-        return lookedBack(job, picked.get(), question);
+        return lookedBack(job, picked.get(), question, chat);
     }
 
-    private String lookedBack(Job job, RecentMaterialPicker.Picked picked, String question) {
+    private String lookedBack(Job job, RecentMaterialPicker.Picked picked, String question, RecentConversation.Snapshot chat) {
         Material material = picked.material();
         String reply;
         try {
-            reply = checkMaterial(job, material, question);
+            reply = checkMaterial(job, material, question, chat);
         } catch (InvalidModelOutputException e) {
             // We guessed the message; if the model still cannot use it, asking beats retrying the guess.
             log.info("look-back unusable jobId={} cause={}", job.id(), e.getMessage());
@@ -151,12 +159,13 @@ public class JobRunner {
     }
 
     // Voice and video are transcribed first; anything that cannot be checked gets a plain notice.
-    private String checkMaterial(Job job, Material material, String question) {
+    private String checkMaterial(Job job, Material material, String question, RecentConversation.Snapshot chat) {
         if (material.kind() == MaterialKind.BOT_REPLY) {
             // A follow-up keeps pointing at what the discussion started from, so it never grows turn by turn.
             String about = materials.about(material.groupId(), material.messageId()).orElse(null);
             Material target = RecentMaterialPicker.asFollowUp(material, about);
-            return recorded(job, factCheckService.verify(job.groupId(), target, question), about == null ? material.text() : about);
+            return recorded(job, factCheckService.verify(job.groupId(), target, question, chat.text()),
+                    about == null ? material.text() : about);
         }
         Material target = material;
         if (material.kind() == MaterialKind.AUDIO || material.kind() == MaterialKind.VIDEO) {
@@ -187,7 +196,7 @@ public class JobRunner {
             }
         }
         String about = target.text() == null ? IMAGE_ABOUT : target.text();
-        return recorded(job, factCheckService.verify(job.groupId(), target, question), about);
+        return recorded(job, factCheckService.verify(job.groupId(), target, question, chat.text()), about);
     }
 
     private String recorded(Job job, FactCheckReply reply, String about) {

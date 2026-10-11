@@ -19,6 +19,7 @@ import java.time.Duration;
 import static com.elvischang.ailinebot.support.Webhooks.body;
 import static com.elvischang.ailinebot.support.Webhooks.groupMention;
 import static com.elvischang.ailinebot.support.Webhooks.groupAudio;
+import static com.elvischang.ailinebot.support.Webhooks.groupImage;
 import static com.elvischang.ailinebot.support.Webhooks.groupText;
 import static com.elvischang.ailinebot.support.Webhooks.groupVideo;
 import static com.elvischang.ailinebot.support.Webhooks.groupTextFrom;
@@ -165,6 +166,32 @@ class JobFlowTest extends IntegrationTestSupport {
 
         assertThat(factChecks.materialTexts()).containsExactly(
                 RecentMaterialPicker.asFollowUp("明天台北會下雨嗎", "TEST RESULT question"));
+    }
+
+    @Test
+    void everyCheckSeesTheLastHalfHourOfTheGroupChat() throws Exception {
+        stubReplyOk("900");
+        LINE.stubFor(get(urlEqualTo("/v2/bot/group/Cg1/member/Uaunt"))
+                .willReturn(okJson("{\"displayName\":\"阿姨\",\"userId\":\"Uaunt\"}")));
+        postWebhook(body(groupTextFrom("e1", "Cg1", "97", "晚上七點   老家吃飯", "Uaunt"), groupImage("e2", "Cg1", "98")));
+        postWebhook(body(groupMention("e3", "Cg1", "100", "阿姨說幾點吃飯", null)));
+
+        awaitSendState("100", SendState.REPLIED);
+        assertThat(factChecks.conversations()).containsExactly(
+                "#1 08:00 阿姨：晚上七點 老家吃飯\n#2 08:00 家人：（傳了一張圖片）");
+    }
+
+    @Test
+    void theModelCanPointAtAnOlderMessageToCheck() throws Exception {
+        stubReplyOk("900");
+        factChecks.askForMaterialAt(1);
+        postWebhook(body(groupTextFrom("e1", "Cg1", "97", "喝檸檬水可以治癌症", "Uaunt"),
+                groupTextFrom("e2", "Cg1", "98", "晚上吃什麼", "Uother")));
+        postWebhook(body(groupMention("e3", "Cg1", "100", "阿姨傳的那個是真的嗎", null)));
+
+        awaitSendState("100", SendState.REPLIED);
+        assertThat(factChecks.calls()).containsExactly(RecordingFactCheckService.QUESTION_ONLY, "97");
+        assertThat(factChecks.materialTexts()).containsExactly("喝檸檬水可以治癌症");
     }
 
     @Test

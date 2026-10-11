@@ -13,7 +13,7 @@ class OpenAiLiveSpikeTest {
 
     static FactCheckProperties liveProps(String model) {
         return new FactCheckProperties("https://api.openai.com/v1", System.getenv("OPENAI_API_KEY"), model, "medium", 3,
-                Duration.ofSeconds(40), 100_000, 500_000, 10_000, 2_000_000, 40_000_000, Duration.ofHours(24), "v9");
+                Duration.ofSeconds(40), 100_000, 500_000, 10_000, 2_000_000, 40_000_000, Duration.ofHours(24), "v10");
     }
 
     @Test
@@ -83,5 +83,26 @@ class OpenAiLiveSpikeTest {
         System.out.println("follow-up mode=" + check.result().mode() + " points=" + check.result().answerPoints());
         assertThat(check.result().mode()).isEqualTo(ReplyMode.ANSWER);
         assertThat(String.join("", check.result().answerPoints())).contains("癌");
+    }
+    @Test
+    void usesTheRecentChatToAnswerOrToPointAtAMessage() {
+        FactCheckProperties props = liveProps("gpt-6-luna");
+        OpenAiResponsesFactChecker checker = new OpenAiResponsesFactChecker(props, new FactCheckPrompt(props),
+                org.mockito.Mockito.mock(SpendRepository.class), java.time.Clock.systemUTC());
+        String chat = """
+                #1 20:01 阿姨：每天早上空腹喝一杯熱檸檬水，可以殺死癌細胞，請轉發給你關心的人
+                #2 20:03 爸爸：週六晚上七點在老家吃飯，記得帶水果
+                #3 20:05 小明：收到""";
+
+        ModelCheck dinner = checker.check(new FactCheckInput(null, null, null, "爸爸說幾點吃飯？", LocalDate.now(), chat));
+        ModelCheck rumour = checker.check(new FactCheckInput(null, null, null, "阿姨傳的那個是真的嗎", LocalDate.now(), chat));
+
+        System.out.println("dinner mode=" + dinner.result().mode() + " points=" + dinner.result().answerPoints()
+                + " headline=" + dinner.result().headline());
+        System.out.println("rumour mode=" + rumour.result().mode() + " target=" + rumour.targetMessage());
+        assertThat(dinner.result().mode()).isEqualTo(ReplyMode.ANSWER);
+        assertThat(dinner.result().headline() + dinner.result().answerPoints()).containsAnyOf("七點", "7 點", "7點", "19");
+        assertThat(rumour.result().mode()).isEqualTo(ReplyMode.NEED_MATERIAL);
+        assertThat(rumour.targetMessage()).isEqualTo(1);
     }
 }

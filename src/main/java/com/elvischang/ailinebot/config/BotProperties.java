@@ -20,5 +20,6 @@ public record BotProperties(
         int mediaMaxAttempts,
         Duration mediaDownloadTimeout,
         Duration jobRetention,
-        int maxMessagesPerReply) {
+        int maxMessagesPerReply,
+        int conversationMessages) {
 }

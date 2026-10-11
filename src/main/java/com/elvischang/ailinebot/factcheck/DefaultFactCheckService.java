@@ -61,9 +61,9 @@ public class DefaultFactCheckService implements FactCheckService {
     }
 
     @Override
-    public FactCheckReply verify(String groupId, Material material, String userQuestion) {
+    public FactCheckReply verify(String groupId, Material material, String userQuestion, String conversation) {
         if (material == null) {
-            return check(groupId, null, null, null, userQuestion);
+            return check(groupId, null, null, null, userQuestion, conversation);
         }
         if (material.kind() == MaterialKind.IMAGE && material.mediaStatus() != MediaStatus.STORED) {
             return FactCheckReply.notice(material.mediaStatus() == MediaStatus.PENDING
@@ -74,33 +74,36 @@ public class DefaultFactCheckService implements FactCheckService {
             return FactCheckReply.notice(BotReplies.IMAGE_GONE);
         }
         if (material.kind() == MaterialKind.AUDIO || material.kind() == MaterialKind.VIDEO) {
-            return checkMedia(groupId, material, userQuestion);
+            return checkMedia(groupId, material, userQuestion, conversation);
         }
         String text = material.kind() == MaterialKind.IMAGE ? null : material.text();
         byte[] image = material.kind() == MaterialKind.IMAGE ? readImage(material) : null;
         if (material.kind() == MaterialKind.IMAGE && image == null) {
             return FactCheckReply.notice(BotReplies.IMAGE_GONE);
         }
-        return check(groupId, text, image, material.mediaSha256(), userQuestion);
+        return check(groupId, text, image, material.mediaSha256(), userQuestion, conversation);
     }
 
     // Callers transcribe first (MediaTranscriber); a video also brings its preview frame when LINE had one.
-    private FactCheckReply checkMedia(String groupId, Material media, String userQuestion) {
+    private FactCheckReply checkMedia(String groupId, Material media, String userQuestion, String conversation) {
         String words = media.text() == null ? "" : media.text();
         if (media.kind() == MaterialKind.AUDIO) {
-            return check(groupId, VOICE_LABEL + words, null, null, userQuestion);
+            return check(groupId, VOICE_LABEL + words, null, null, userQuestion, conversation);
         }
         byte[] frame = media.mediaSha256() == null ? null : readImage(media);
         String label = frame == null ? VIDEO_NO_FRAME_LABEL : words.isBlank() ? VIDEO_FRAME_ONLY_LABEL : VIDEO_LABEL;
-        return check(groupId, label + words, frame, frame == null ? null : media.mediaSha256(), userQuestion);
+        return check(groupId, label + words, frame, frame == null ? null : media.mediaSha256(), userQuestion, conversation);
     }
 
-    private FactCheckReply check(String groupId, String text, byte[] image, String imageSha256, String userQuestion) {
+    private FactCheckReply check(String groupId, String text, byte[] image, String imageSha256, String userQuestion,
+                                 String conversation) {
         List<String> links = links(text, userQuestion);
         long now = clock.millis();
         String key = cacheKey(userQuestion, text, imageSha256);
+        // A bare question may lean on the chat ("is what auntie said true"), so its answer only holds for that chat.
+        boolean cacheable = text != null || image != null || conversation == null || conversation.isBlank();
 
-        Optional<FactCheckResult> cached = cache.get(key, now);
+        Optional<FactCheckResult> cached = cacheable ? cache.get(key, now) : Optional.empty();
         if (cached.isPresent()) {
             logOutcome(groupId, true, cached.get(), Usage.NONE, 0);
             boolean unopened = noneOpened(links, cached.get().sources().stream().map(FactCheckResult.Source::url).toList());
@@ -113,7 +116,7 @@ public class DefaultFactCheckService implements FactCheckService {
         ModelCheck check;
         try {
             check = checker.check(new FactCheckInput(text, image, image == null ? null : mimeType(image),
-                    userQuestion, LocalDate.now(clock.withZone(TAIPEI))));
+                    userQuestion, LocalDate.now(clock.withZone(TAIPEI)), conversation));
         } catch (OutOfCreditException e) {
             log.warn("factcheck refused groupHash={} reason=out_of_credit", Hashes.shortHash(groupId));
             return FactCheckReply.notice(BotReplies.OUT_OF_CREDIT);
@@ -123,12 +126,17 @@ public class DefaultFactCheckService implements FactCheckService {
         }
         FactCheckResult filtered = CitationFilter.apply(check.result(), check.consultedUrls());
         // Answers go stale (weather, news) and new rumours often get fact-checked hours later, so neither may stick.
-        if (filtered.mode() == ReplyMode.FACT_CHECK && filtered.overall() != Verdict.INSUFFICIENT_EVIDENCE) {
+        if (cacheable && filtered.mode() == ReplyMode.FACT_CHECK && filtered.overall() != Verdict.INSUFFICIENT_EVIDENCE) {
             cache.put(key, filtered, now);
         }
         long cost = check.usage().costMicroUsd(props);
         logOutcome(groupId, false, filtered, check.usage(), cost);
-        return reply(filtered, noneOpened(links, check.consultedUrls()), check.usage(), cost);
+        FactCheckReply reply = reply(filtered, noneOpened(links, check.consultedUrls()), check.usage(), cost);
+        return filtered.mode() == ReplyMode.NEED_MATERIAL ? withTarget(reply, check.targetMessage()) : reply;
+    }
+
+    private static FactCheckReply withTarget(FactCheckReply reply, Integer targetMessage) {
+        return new FactCheckReply(reply.text(), reply.verdict(), reply.mode(), reply.usage(), reply.costMicroUsd(), targetMessage);
     }
 
     private static List<String> links(String text, String userQuestion) {

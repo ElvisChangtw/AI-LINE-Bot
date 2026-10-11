@@ -18,7 +18,9 @@ public class RecordingFactCheckService implements FactCheckService {
 
     private final List<String> calls = new CopyOnWriteArrayList<>();
     private final List<String> materialTexts = new CopyOnWriteArrayList<>();
+    private final List<String> conversations = new CopyOnWriteArrayList<>();
     private volatile boolean needsMaterialWhenAlone;
+    private volatile Integer targetMessage;
     private volatile Function<Material, String> behavior = RecordingFactCheckService::defaultResult;
     private volatile FactCheckService delegate;
 
@@ -27,16 +29,17 @@ public class RecordingFactCheckService implements FactCheckService {
     }
 
     @Override
-    public FactCheckReply verify(String groupId, Material material, String userQuestion) {
+    public FactCheckReply verify(String groupId, Material material, String userQuestion, String conversation) {
         calls.add(material == null ? QUESTION_ONLY : material.messageId());
+        conversations.add(String.valueOf(conversation));
         if (material != null) {
             materialTexts.add(String.valueOf(material.text()));
         }
         if (material == null && needsMaterialWhenAlone) {
-            return new FactCheckReply(BotReplies.ASK_TO_QUOTE, null, ReplyMode.NEED_MATERIAL, Usage.NONE, 0);
+            return new FactCheckReply(BotReplies.ASK_TO_QUOTE, null, ReplyMode.NEED_MATERIAL, Usage.NONE, 0, targetMessage);
         }
         FactCheckService real = delegate;
-        return real != null ? real.verify(groupId, material, userQuestion) : FactCheckReply.notice(behavior.apply(material));
+        return real != null ? real.verify(groupId, material, userQuestion, conversation) : FactCheckReply.notice(behavior.apply(material));
     }
 
     public List<String> calls() {
@@ -47,7 +50,16 @@ public class RecordingFactCheckService implements FactCheckService {
         return List.copyOf(materialTexts);
     }
 
+    public List<String> conversations() {
+        return List.copyOf(conversations);
+    }
+
     public void askForMaterialWhenAlone() {
+        this.needsMaterialWhenAlone = true;
+    }
+
+    public void askForMaterialAt(int number) {
+        this.targetMessage = number;
         this.needsMaterialWhenAlone = true;
     }
 
@@ -62,7 +74,9 @@ public class RecordingFactCheckService implements FactCheckService {
     public void reset() {
         calls.clear();
         materialTexts.clear();
+        conversations.clear();
         needsMaterialWhenAlone = false;
+        targetMessage = null;
         behavior = RecordingFactCheckService::defaultResult;
         delegate = null;
     }

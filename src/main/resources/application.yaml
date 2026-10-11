@@ -42,6 +42,7 @@ bot:
   material-ttl: 7d
   waiting-ttl: 24h
   recent-window: 30m
+  conversation-messages: 20
   job-lease: 5m
   job-max-attempts: 3
   stale-after: 30s
@@ -81,4 +82,4 @@ factcheck:
   daily-limit-micro-usd: 2000000
   monthly-limit-micro-usd: 10000000
   cache-ttl: 24h
-  prompt-version: v9
+  prompt-version: v10

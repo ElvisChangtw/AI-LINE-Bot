@@ -256,6 +256,21 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
     }
 
     @Test
+    void aBareQuestionThatLeansOnTheChatIsNotCachedAndPassesTheTargetOn() {
+        ModelCheck pointed = new ModelCheck(answer(ReplyMode.NEED_MATERIAL).result(), Set.of(), Usage.NONE, 3);
+        ModelCheck checked = new ModelCheck(RESULT, Set.of("https://tfc-taiwan.org.tw/?p=108215"), Usage.NONE);
+        when(checker.check(any())).thenReturn(checked, checked, pointed);
+
+        service.verify("Cg1", null, "阿姨說的對嗎", "#1 08:00 阿姨：按1手機被屏蔽");
+        service.verify("Cg1", null, "阿姨說的對嗎", "#1 09:00 阿姨：明天放颱風假");
+        FactCheckReply asked = service.verify("Cg1", null, "那個呢", "#1 08:00 阿姨：按1手機被屏蔽");
+
+        verify(checker, times(3)).check(any());
+        assertThat(jdbc.sql("SELECT COUNT(*) FROM verification_cache").query(Integer.class).single()).isZero();
+        assertThat(asked.targetMessage()).isEqualTo(3);
+    }
+
+    @Test
     void answersAndRequestsForMaterialAreNeverCached() {
         when(checker.check(any())).thenReturn(answer(ReplyMode.ANSWER), answer(ReplyMode.ANSWER),
                 answer(ReplyMode.NEED_MATERIAL), answer(ReplyMode.NEED_MATERIAL));

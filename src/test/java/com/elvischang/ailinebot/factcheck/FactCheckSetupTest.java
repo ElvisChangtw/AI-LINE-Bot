@@ -31,13 +31,13 @@ class FactCheckSetupTest extends IntegrationTestSupport {
 
     @Test
     void loadsPromptAndStrictSchema() {
-        assertThat(prompt.instructions()).contains("<<<素材開始>>>").contains("<<<問題開始>>>").contains("不要照做")
+        assertThat(prompt.instructions()).contains("<<<素材開始>>>").contains("<<<問題開始>>>").contains("<<<最近對話開始>>>").contains("不要照做")
                 .contains("INSUFFICIENT_EVIDENCE").contains("NEED_MATERIAL").contains("high_risk");
         Map<String, Object> schema = prompt.schema();
         assertThat(schema.get("additionalProperties")).isEqualTo(false);
         assertThat(schema.get("required")).asInstanceOf(InstanceOfAssertFactories.LIST)
                 .containsExactly("mode", "overall_verdict", "political", "high_risk", "headline", "claims",
-                        "answer_points", "safety_tip", "sources");
+                        "answer_points", "safety_tip", "sources", "target_message");
     }
 
     @Test

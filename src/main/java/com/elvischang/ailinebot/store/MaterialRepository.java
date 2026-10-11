@@ -119,6 +119,25 @@ public class MaterialRepository {
                 .list();
     }
 
+    // Everything said in the group, including questions to the bot and its replies, oldest first.
+    public List<RecentMessage> conversation(String groupId, long since, long until, String excludeMessageId, int limit) {
+        List<RecentMessage> newestFirst = jdbc.sql("""
+                        SELECT * FROM material
+                        WHERE group_id = :g AND created_at >= :since AND created_at <= :until AND message_id <> :exclude
+                          AND (kind <> 'BOT_REPLY' OR text IS NOT NULL)
+                        ORDER BY created_at DESC, rowid DESC
+                        LIMIT :limit
+                        """)
+                .param("g", groupId)
+                .param("since", since)
+                .param("until", until)
+                .param("exclude", excludeMessageId)
+                .param("limit", limit)
+                .query((rs, n) -> new RecentMessage(MAPPER.mapRow(rs, n), rs.getString("sender_id")))
+                .list();
+        return newestFirst.reversed();
+    }
+
     public OptionalLong mediaDurationMs(String groupId, String messageId) {
         return jdbc.sql("SELECT media_duration_ms FROM material WHERE group_id = :g AND message_id = :m")
                 .param("g", groupId)

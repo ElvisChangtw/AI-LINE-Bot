@@ -37,7 +37,8 @@ public class OpenAiResponsesFactChecker implements FactChecker {
     private static final int MAX_CLAIMS = 3;
     private static final int MAX_ANSWER_POINTS = 2;
     private static final String NO_QUESTION = "使用者沒有寫問題，請查證下面的素材";
-    private static final List<String> DELIMITERS = List.of("<<<問題開始>>>", "<<<問題結束>>>", "<<<素材開始>>>", "<<<素材結束>>>");
+    private static final List<String> DELIMITERS = List.of("<<<問題開始>>>", "<<<問題結束>>>", "<<<素材開始>>>", "<<<素材結束>>>",
+            "<<<最近對話開始>>>", "<<<最近對話結束>>>");
     private static final long ESTIMATED_FAILURE_INPUT_TOKENS = 20_000;
     private static final long ESTIMATED_FAILURE_OUTPUT_TOKENS = 4_000;
     private static final int FIRST_SERVER_ERROR_STATUS = 500;
@@ -105,7 +106,8 @@ public class OpenAiResponsesFactChecker implements FactChecker {
         long out = response.usage().map(u -> u.outputTokens()).orElse(0L);
         Usage usage = new Usage(in, out, searchCalls);
         spending.record(clock.millis(), usage.costMicroUsd(props));
-        return new ModelCheck(parse(text.toString()), Set.copyOf(consulted), usage);
+        String json = text.toString();
+        return new ModelCheck(parse(json), Set.copyOf(consulted), usage, targetMessage(json));
     }
 
     private Response create(ResponseCreateParams params) {
@@ -155,7 +157,9 @@ public class OpenAiResponsesFactChecker implements FactChecker {
 
     private static String userText(FactCheckInput input) {
         String question = input.userQuestion() == null || input.userQuestion().isBlank() ? NO_QUESTION : input.userQuestion();
-        String text = "今天日期：" + input.today() + "（台灣時間）\n"
+        String chat = input.conversation() == null || input.conversation().isBlank() ? ""
+                : "<<<最近對話開始>>>\n" + neutralized(input.conversation()) + "\n<<<最近對話結束>>>\n";
+        String text = "今天日期：" + input.today() + "（台灣時間）\n" + chat
                 + "<<<問題開始>>>\n" + neutralized(question) + "\n<<<問題結束>>>";
         if (input.materialText() == null && input.image() == null) {
             return text;
@@ -190,6 +194,16 @@ public class OpenAiResponsesFactChecker implements FactChecker {
         return action.get().asSearch().sources().orElse(List.of()).stream()
                 .flatMap(source -> source._url().asString().stream())
                 .toList();
+    }
+
+    // Only meaningful with NEED_MATERIAL; parse() has already rejected output that is not JSON.
+    private Integer targetMessage(String json) {
+        try {
+            JsonNode value = mapper.readTree(json).get("target_message");
+            return value != null && value.canConvertToInt() && value.isIntegralNumber() ? value.intValue() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private FactCheckResult parse(String json) {

@@ -1,7 +1,8 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["mode", "overall_verdict", "political", "high_risk", "headline", "claims", "answer_points", "safety_tip", "sources"],
+  "required": ["mode", "overall_verdict", "political", "high_risk", "headline", "claims", "answer_points", "safety_tip", "sources",
+               "target_message"],
   "properties": {
     "mode": {
       "type": "string",
@@ -35,6 +36,7 @@
       "items": { "type": "string" }
     },
     "safety_tip": { "type": "boolean" },
+    "target_message": { "type": ["integer", "null"] },
     "sources": {
       "type": "array",
       "items": {
