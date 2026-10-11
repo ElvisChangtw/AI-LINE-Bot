@@ -3,6 +3,8 @@ package com.elvischang.ailinebot.factcheck;
 import com.elvischang.ailinebot.delivery.BotReplies;
 import com.elvischang.ailinebot.line.Hashes;
 import com.elvischang.ailinebot.media.MediaStore;
+import com.elvischang.ailinebot.media.YouTubeLinks;
+import com.elvischang.ailinebot.media.YouTubeWatcher;
 import com.elvischang.ailinebot.store.Material;
 import com.elvischang.ailinebot.store.MaterialKind;
 import com.elvischang.ailinebot.store.MediaStatus;
@@ -39,6 +41,7 @@ public class DefaultFactCheckService implements FactCheckService {
     static final String VOICE_LABEL = "（語音訊息轉成的文字）\n";
     static final String VIDEO_LABEL = "（影片的語音轉成的文字，圖片是影片裡的畫面，通常是從頭到尾平均取的 6 個畫面拼成一張）\n";
     static final String VIDEO_NO_FRAME_LABEL = "（影片的語音轉成的文字）\n";
+    static final String YOUTUBE_LABEL = "（以下是另一個 AI 看過訊息裡那支 YouTube 影片後整理的內容；超過 10 分鐘的影片只看了前 10 分鐘）\n";
     static final String VIDEO_FRAME_ONLY_LABEL = "（影片裡沒有聽到說話，只附影片裡的畫面，通常是從頭到尾平均取的 6 個畫面拼成一張）\n";
     private static final Pattern SCHEME_AND_WWW = Pattern.compile("^(https?://)?(www\\.)?", Pattern.CASE_INSENSITIVE);
     private static final Pattern WHITESPACE = Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS);
@@ -47,15 +50,17 @@ public class DefaultFactCheckService implements FactCheckService {
     private final VerificationCacheRepository cache;
     private final UsageGuard usageGuard;
     private final MediaStore mediaStore;
+    private final YouTubeWatcher youTube;
     private final FactCheckProperties props;
     private final Clock clock;
 
     public DefaultFactCheckService(FactChecker checker, VerificationCacheRepository cache, UsageGuard usageGuard,
-                                   MediaStore mediaStore, FactCheckProperties props, Clock clock) {
+                                   MediaStore mediaStore, YouTubeWatcher youTube, FactCheckProperties props, Clock clock) {
         this.checker = checker;
         this.cache = cache;
         this.usageGuard = usageGuard;
         this.mediaStore = mediaStore;
+        this.youTube = youTube;
         this.props = props;
         this.clock = clock;
     }
@@ -95,9 +100,15 @@ public class DefaultFactCheckService implements FactCheckService {
         return check(groupId, label + words, frame, frame == null ? null : media.mediaSha256(), userQuestion, conversation);
     }
 
-    private FactCheckReply check(String groupId, String text, byte[] image, String imageSha256, String userQuestion,
+    private FactCheckReply check(String groupId, String material, byte[] image, String imageSha256, String userQuestion,
                                  String conversation) {
-        List<String> links = links(text, userQuestion);
+        boolean hasMaterial = material != null || image != null;
+        Optional<String> watched = YouTubeLinks.firstVideoId(material, userQuestion).flatMap(youTube::summary);
+        String text = watched.map(s -> (material == null ? "" : material + "\n\n") + YOUTUBE_LABEL + s).orElse(material);
+        // A watched video counts as opened even though web search never fetched the page.
+        List<String> links = links(material, userQuestion).stream()
+                .filter(link -> watched.isEmpty() || !YouTubeLinks.isYouTube(link))
+                .toList();
         long now = clock.millis();
         String key = cacheKey(userQuestion, text, imageSha256);
         // An answer that saw the chat may quote it or lean on it, so it must not be served to anyone else.
@@ -121,7 +132,7 @@ public class DefaultFactCheckService implements FactCheckService {
             log.warn("factcheck refused groupHash={} reason=out_of_credit", Hashes.shortHash(groupId));
             return FactCheckReply.notice(BotReplies.OUT_OF_CREDIT);
         }
-        if (check.result().mode() == ReplyMode.NEED_MATERIAL && (text != null || image != null)) {
+        if (check.result().mode() == ReplyMode.NEED_MATERIAL && hasMaterial) {
             throw new InvalidModelOutputException("asked for material that was already sent");
         }
         FactCheckResult filtered = CitationFilter.apply(check.result(), check.consultedUrls());

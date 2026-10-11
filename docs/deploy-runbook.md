@@ -53,7 +53,7 @@ AWS_PROFILE=<個人 profile> AWS_REGION=ap-northeast-1 EXPECTED_ACCOUNT_ID=<...>
 ## 4. 主機上的 secret
 
 ```bash
-sudo nano /opt/linebot/app.env       # LINE_CHANNEL_SECRET、LINE_CHANNEL_TOKEN、OPENAI_API_KEY
+sudo nano /opt/linebot/app.env       # LINE_CHANNEL_SECRET、LINE_CHANNEL_TOKEN、OPENAI_API_KEY、GEMINI_API_KEY（選填）
 sudo nano /opt/linebot/tunnel.env    # TUNNEL_TOKEN=<第 1 步的 token>
 ```
 

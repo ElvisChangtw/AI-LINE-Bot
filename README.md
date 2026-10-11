@@ -8,7 +8,7 @@
 
 | 動作 | bot 的反應 |
 |---|---|
-| 引用一則訊息（文字、圖片、語音、影片）＋ @ bot | 查證那則；語音和影片先轉成文字（影片再從頭到尾取 6 個畫面，字幕也讀得到），超過 5 分鐘的不處理；有寫問題就針對問題回答 |
+| 引用一則訊息（文字、圖片、語音、影片）＋ @ bot | 查證那則；語音和影片先轉成文字（影片再從頭到尾取 6 個畫面，字幕也讀得到），超過 5 分鐘的不處理；訊息裡有公開的 YouTube 連結時，交給 Gemini 看影片前 10 分鐘、整理內容再查證（同一支影片的整理留 7 天）；有寫問題就針對問題回答 |
 | 直接 @ bot 問問題 | 上網查資料後回答；健康、錢、法規、補助、即時資訊查不到可靠來源就不亂答。沒引用的提問會附上群組最近 30 分鐘、最多 20 則對話（含名字），所以「剛剛爸爸說幾點吃飯」「阿姨傳的那個是真的嗎」也看得懂 |
 | 沒引用、問「這是真的嗎」或只打 @ bot | 查最近對話裡模型指出的那則；沒指出就用 30 分鐘內最新的一則（同一個人連續傳的會合在一起），回覆會寫看的是誰幾點傳的哪則 |
 | 引用 bot 的回覆＋問題，或直接問「你為什麼說…」 | 連同最初被問的那則訊息一起看，聊幾輪都記得在講哪件事；發現判錯會直接更正 |
@@ -53,6 +53,6 @@ Lightsail（docker compose：app＋cloudflared）＋ GitHub Actions → ECR → 
 
 | 位置 | 內容 |
 |---|---|
-| `/opt/linebot/app.env` | `LINE_CHANNEL_SECRET`、`LINE_CHANNEL_TOKEN`、`OPENAI_API_KEY`（600） |
+| `/opt/linebot/app.env` | `LINE_CHANNEL_SECRET`、`LINE_CHANNEL_TOKEN`、`OPENAI_API_KEY`、`GEMINI_API_KEY`（選填，空白就不看 YouTube）（600） |
 | `/opt/linebot/tunnel.env` | `TUNNEL_TOKEN`（600） |
 | `/opt/linebot/deploy.env` | `ECR_REPO`、`AWS_REGION` |

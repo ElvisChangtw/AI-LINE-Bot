@@ -90,7 +90,7 @@ install -d -m 700 "$DIR"
 printf 'ECR_REPO=%s\nAWS_REGION=%s\n' "$ECR_REPO" "$AWS_REGION" > "$DIR/deploy.env"
 chmod 600 "$DIR/deploy.env"
 if [[ ! -f "$DIR/app.env" ]]; then
-  printf 'LINE_CHANNEL_SECRET=\nLINE_CHANNEL_TOKEN=\nOPENAI_API_KEY=\n' > "$DIR/app.env"
+  printf 'LINE_CHANNEL_SECRET=\nLINE_CHANNEL_TOKEN=\nOPENAI_API_KEY=\nGEMINI_API_KEY=\n' > "$DIR/app.env"
 fi
 if [[ ! -f "$DIR/tunnel.env" ]]; then
   printf 'TUNNEL_TOKEN=\n' > "$DIR/tunnel.env"

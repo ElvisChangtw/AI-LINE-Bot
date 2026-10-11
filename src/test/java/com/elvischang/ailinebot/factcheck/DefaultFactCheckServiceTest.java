@@ -2,6 +2,7 @@ package com.elvischang.ailinebot.factcheck;
 
 import com.elvischang.ailinebot.delivery.BotReplies;
 import com.elvischang.ailinebot.media.MediaStore;
+import com.elvischang.ailinebot.media.YouTubeWatcher;
 import com.elvischang.ailinebot.store.Material;
 import com.elvischang.ailinebot.store.MaterialKind;
 import com.elvischang.ailinebot.store.MaterialRepository;
@@ -51,6 +52,9 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
 
     @Autowired
     FactCheckProperties props;
+
+    @MockBean
+    YouTubeWatcher youTube;
 
     private static final FactCheckResult RESULT = FactCheckResult.factCheck(Verdict.INCORRECT, false, "舊謠言",
             List.of(new FactCheckResult.Claim("c", Verdict.INCORRECT, "按 1 不會讓手機被控制")), true,
@@ -157,7 +161,8 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
                 props.reasoningEffort(), props.maxToolCalls(), props.requestTimeout(), props.inputMicroUsdPerMillion(),
                 props.outputMicroUsdPerMillion(), props.searchMicroUsdPerCall(), props.dailyLimitMicroUsd(),
                 props.monthlyLimitMicroUsd(), props.cacheTtl(), props.promptVersion());
-        DefaultFactCheckService otherService = new DefaultFactCheckService(checker, cache, usageGuard, mediaStore, otherModel, clock);
+        DefaultFactCheckService otherService = new DefaultFactCheckService(checker, cache, usageGuard, mediaStore, youTube,
+                otherModel, clock);
 
         ask(text("Cg1", "1", "按1 手機被屏蔽"), "真的嗎");
         otherService.verify("Cg2", text("Cg2", "2", "按1 手機被屏蔽"), "真的嗎");
@@ -268,6 +273,20 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
         verify(checker, times(3)).check(any());
         assertThat(jdbc.sql("SELECT COUNT(*) FROM verification_cache").query(Integer.class).single()).isZero();
         assertThat(asked.targetMessage()).isEqualTo(3);
+    }
+
+    @Test
+    void aYouTubeLinkIsCheckedFromWhatGeminiSawInTheVideo() {
+        when(youTube.summary("dQw4w9WgXcQ")).thenReturn(java.util.Optional.of("講者說喝熱檸檬水可以殺死癌細胞"));
+        answerWithResult();
+
+        FactCheckReply reply = ask(text("Cg1", "1", "快看 https://youtu.be/dQw4w9WgXcQ"), "");
+
+        ArgumentCaptor<FactCheckInput> input = ArgumentCaptor.forClass(FactCheckInput.class);
+        verify(checker).check(input.capture());
+        assertThat(input.getValue().materialText()).isEqualTo("快看 https://youtu.be/dQw4w9WgXcQ\n\n"
+                + DefaultFactCheckService.YOUTUBE_LABEL + "講者說喝熱檸檬水可以殺死癌細胞");
+        assertThat(reply.text()).doesNotContain(BotReplies.LINK_NOT_OPENED);
     }
 
     @Test

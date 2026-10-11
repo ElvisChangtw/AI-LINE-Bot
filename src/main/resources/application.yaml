@@ -55,6 +55,16 @@ bot:
   recovery-interval-ms: 60000
   cleanup-cron: "0 30 3 * * *"
   scheduling-enabled: true
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  base-url: https://generativelanguage.googleapis.com/v1beta
+  model: gemini-3.5-flash-lite
+  max-clip: 10m
+  request-timeout: 120s
+  input-micro-usd-per-million: 300000
+  output-micro-usd-per-million: 2500000
+  max-output-tokens: 4096
+  summary-ttl: 7d
 transcribe:
   model: gpt-transcribe
   micro-usd-per-minute: 4500
@@ -82,4 +92,4 @@ factcheck:
   daily-limit-micro-usd: 2000000
   monthly-limit-micro-usd: 10000000
   cache-ttl: 24h
-  prompt-version: v10
+  prompt-version: v11
