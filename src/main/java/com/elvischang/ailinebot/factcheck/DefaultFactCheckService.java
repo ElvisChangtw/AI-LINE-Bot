@@ -100,8 +100,8 @@ public class DefaultFactCheckService implements FactCheckService {
         List<String> links = links(text, userQuestion);
         long now = clock.millis();
         String key = cacheKey(userQuestion, text, imageSha256);
-        // A bare question may lean on the chat ("is what auntie said true"), so its answer only holds for that chat.
-        boolean cacheable = text != null || image != null || conversation == null || conversation.isBlank();
+        // An answer that saw the chat may quote it or lean on it, so it must not be served to anyone else.
+        boolean cacheable = conversation == null || conversation.isBlank();
 
         Optional<FactCheckResult> cached = cacheable ? cache.get(key, now) : Optional.empty();
         if (cached.isPresent()) {

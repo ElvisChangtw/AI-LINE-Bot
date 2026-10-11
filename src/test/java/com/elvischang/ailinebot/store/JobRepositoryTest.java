@@ -110,10 +110,14 @@ class JobRepositoryTest extends IntegrationTestSupport {
     @Test
     void clearsContentAndDeletesOldRows() {
         String a = finished("Cg1", 100);
-        jobs.setSendState(List.of(a), SendState.REPLIED);
-        assertThat(jobs.clearContent(101)).isEqualTo(1);
+        String b = finished("Cg1", 100);
+        jobs.setSendState(List.of(a, b), SendState.REPLIED);
+        jdbc.sql("UPDATE job SET about = '身分證 A123456789', result_text = NULL, user_question = NULL WHERE id = :b")
+                .param("b", b).update();
+        assertThat(jobs.clearContent(101)).isEqualTo(2);
         assertThat(jobs.find(a).orElseThrow().resultText()).isNull();
-        assertThat(jobs.deleteOlderThan(101)).isEqualTo(1);
+        assertThat(jobs.find(b).orElseThrow().about()).isNull();
+        assertThat(jobs.deleteOlderThan(101)).isEqualTo(2);
         assertThat(jobs.find(a)).isEmpty();
     }
 
@@ -193,5 +197,18 @@ class JobRepositoryTest extends IntegrationTestSupport {
                 .param("id", id).query((rs, n) -> rs.getString(1) + "/" + rs.getLong(2) + "/" + rs.getLong(3)
                         + "/" + rs.getInt(4) + "/" + rs.getLong(5) + "/" + rs.getString(6)).single())
                 .isEqualTo("INCORRECT/10/20/3/500/FACT_CHECK");
+    }
+
+    @Test
+    void aRetryStartsWithoutTheAboutAnEarlierAttemptRecorded() {
+        String id = jobs.insert(new NewJob(JobKind.FACT_CHECK, "Cg1", "t", "m", "q", "rt", "qt", null), 100);
+        jobs.claim(id, 100, 1000);
+        jobs.recordFactCheck(id, 1, null, com.elvischang.ailinebot.factcheck.ReplyMode.ANSWER,
+                com.elvischang.ailinebot.factcheck.Usage.NONE, 0, "上一次的素材");
+        jobs.release(id, "X", 1);
+
+        jobs.claim(id, 200, 1000);
+
+        assertThat(jobs.find(id).orElseThrow().about()).isNull();
     }
 }

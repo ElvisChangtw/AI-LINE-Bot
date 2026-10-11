@@ -3,15 +3,16 @@ package com.elvischang.ailinebot.material;
 import com.elvischang.ailinebot.config.BotProperties;
 import com.elvischang.ailinebot.line.SenderNames;
 import com.elvischang.ailinebot.store.Material;
+import com.elvischang.ailinebot.store.MaterialKind;
 import com.elvischang.ailinebot.store.MaterialRepository;
 import com.elvischang.ailinebot.store.MediaStatus;
 import com.elvischang.ailinebot.store.RecentMessage;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,6 +24,7 @@ public class RecentConversation {
 
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.of("Asia/Taipei"));
     private static final int MAX_LINE_CHARS = 300;
+    private static final Duration NAME_BUDGET = Duration.ofSeconds(3);
     private static final String BOT_NAME = "AskBot";
     private static final String UNKNOWN_NAME = "家人";
 
@@ -52,22 +54,21 @@ public class RecentConversation {
         if (messages.isEmpty()) {
             return Snapshot.EMPTY;
         }
-        Map<String, String> names = new HashMap<>();
+        List<String> senders = messages.stream().map(RecentMessage::senderId).toList();
+        Map<String, String> names = senderNames.displayNames(groupId, senders, NAME_BUDGET);
         String text = IntStream.range(0, messages.size())
-                .mapToObj(i -> line(i + 1, messages.get(i), name(groupId, messages.get(i), names)))
+                .mapToObj(i -> line(i + 1, messages.get(i), name(messages.get(i), names)))
                 .collect(Collectors.joining("\n"));
         return new Snapshot(text, messages);
     }
 
-    private String name(String groupId, RecentMessage message, Map<String, String> names) {
-        if (message.material().kind() == com.elvischang.ailinebot.store.MaterialKind.BOT_REPLY) {
+    private static String name(RecentMessage message, Map<String, String> names) {
+        if (message.material().kind() == MaterialKind.BOT_REPLY) {
             return BOT_NAME;
         }
-        if (message.senderId() == null) {
-            return UNKNOWN_NAME;
-        }
-        return names.computeIfAbsent(message.senderId(),
-                id -> senderNames.displayName(groupId, id).orElse(UNKNOWN_NAME));
+        String name = message.senderId() == null ? null : names.get(message.senderId());
+        // A family member named "AskBot" must not pass for the bot's own earlier replies.
+        return name == null || name.equalsIgnoreCase(BOT_NAME) ? UNKNOWN_NAME : name;
     }
 
     private static String line(int number, RecentMessage message, String name) {
@@ -91,7 +92,7 @@ public class RecentConversation {
     }
 
     private static String oneLine(String text) {
-        String flat = text.replaceAll("\\s+", " ").strip();
+        String flat = SenderNames.BLANKS.matcher(text).replaceAll(" ").strip();
         return flat.codePointCount(0, flat.length()) <= MAX_LINE_CHARS ? flat
                 : flat.substring(0, flat.offsetByCodePoints(0, MAX_LINE_CHARS)) + "…";
     }

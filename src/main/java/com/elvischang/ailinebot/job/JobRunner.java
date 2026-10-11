@@ -33,6 +33,7 @@ public class JobRunner {
     private static final Logger log = LoggerFactory.getLogger(JobRunner.class);
     private static final int MAX_ABOUT_CHARS = 2000;
     private static final String IMAGE_ABOUT = "（一張圖片）";
+    private static final String SILENT_VIDEO_ABOUT = "（一段沒有說話的影片）";
 
     private final JobRepository jobs;
     private final MaterialRepository materials;
@@ -106,23 +107,26 @@ public class JobRunner {
 
     private String factCheck(Job job) {
         String question = Questions.normalize(job.userQuestion());
-        RecentConversation.Snapshot chat = conversation.of(job.groupId(), job.triggerMessageId(), job.createdAt());
         if (job.materialMessageId() != null) {
             Optional<Material> found = materials.find(job.groupId(), job.materialMessageId());
             if (found.isEmpty()) {
                 return BotReplies.QUOTE_NOT_FOUND;
             }
-            return checkMaterial(job, found.get(), question, chat);
+            return checkMaterial(job, found.get(), question);
         }
         FactCheckReply firstPass = null;
+        // Only a question without a quote needs the chat to know what it refers to; checks of one message stay cacheable.
+        RecentConversation.Snapshot chat = RecentConversation.Snapshot.EMPTY;
         if (!question.isBlank()) {
+            chat = conversation.of(job.groupId(), job.triggerMessageId(), job.createdAt());
             firstPass = factCheckService.verify(job.groupId(), null, question, chat.text());
             if (firstPass.mode() != ReplyMode.NEED_MATERIAL) {
                 return recorded(job, firstPass, question);
             }
         }
-        Optional<RecentMaterialPicker.Picked> picked = chat.message(firstPass == null ? null : firstPass.targetMessage())
-                .flatMap(target -> RecentMaterialPicker.at(chat.messages(), target));
+        RecentConversation.Snapshot seen = chat;
+        Optional<RecentMaterialPicker.Picked> picked = seen.message(firstPass == null ? null : firstPass.targetMessage())
+                .flatMap(target -> RecentMaterialPicker.at(seen.messages(), target));
         if (picked.isEmpty()) {
             // Only a real question can be about our own last answer; a bare "is this true" means the message above.
             picked = picker.pick(job.groupId(), job.triggerMessageId(), job.createdAt(), firstPass != null);
@@ -130,14 +134,14 @@ public class JobRunner {
         if (picked.isEmpty()) {
             return firstPass == null ? BotReplies.ASK_TO_QUOTE : recorded(job, firstPass, question);
         }
-        return lookedBack(job, picked.get(), question, chat);
+        return lookedBack(job, picked.get(), question);
     }
 
-    private String lookedBack(Job job, RecentMaterialPicker.Picked picked, String question, RecentConversation.Snapshot chat) {
+    private String lookedBack(Job job, RecentMaterialPicker.Picked picked, String question) {
         Material material = picked.material();
         String reply;
         try {
-            reply = checkMaterial(job, material, question, chat);
+            reply = checkMaterial(job, material, question);
         } catch (InvalidModelOutputException e) {
             // We guessed the message; if the model still cannot use it, asking beats retrying the guess.
             log.info("look-back unusable jobId={} cause={}", job.id(), e.getMessage());
@@ -159,13 +163,12 @@ public class JobRunner {
     }
 
     // Voice and video are transcribed first; anything that cannot be checked gets a plain notice.
-    private String checkMaterial(Job job, Material material, String question, RecentConversation.Snapshot chat) {
+    private String checkMaterial(Job job, Material material, String question) {
         if (material.kind() == MaterialKind.BOT_REPLY) {
             // A follow-up keeps pointing at what the discussion started from, so it never grows turn by turn.
             String about = materials.about(material.groupId(), material.messageId()).orElse(null);
             Material target = RecentMaterialPicker.asFollowUp(material, about);
-            return recorded(job, factCheckService.verify(job.groupId(), target, question, chat.text()),
-                    about == null ? material.text() : about);
+            return recorded(job, factCheckService.verify(job.groupId(), target, question), about == null ? material.text() : about);
         }
         Material target = material;
         if (material.kind() == MaterialKind.AUDIO || material.kind() == MaterialKind.VIDEO) {
@@ -195,8 +198,9 @@ public class JobRunner {
                 }
             }
         }
-        String about = target.text() == null ? IMAGE_ABOUT : target.text();
-        return recorded(job, factCheckService.verify(job.groupId(), target, question, chat.text()), about);
+        String about = target.text() != null && !target.text().isBlank() ? target.text()
+                : material.kind() == MaterialKind.VIDEO ? SILENT_VIDEO_ABOUT : IMAGE_ABOUT;
+        return recorded(job, factCheckService.verify(job.groupId(), target, question), about);
     }
 
     private String recorded(Job job, FactCheckReply reply, String about) {

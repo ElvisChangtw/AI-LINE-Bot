@@ -78,7 +78,7 @@ public class JobRepository {
 
     public boolean claim(String id, long now, long leaseMs) {
         return jdbc.sql("""
-                        UPDATE job SET status = 'RUNNING', attempts = attempts + 1, lease_until = :lease
+                        UPDATE job SET status = 'RUNNING', attempts = attempts + 1, lease_until = :lease, about = NULL
                         WHERE id = :id AND status = 'PENDING'
                         """)
                 .param("lease", now + leaseMs)
@@ -243,9 +243,9 @@ public class JobRepository {
 
     public int clearContent(long createdBefore) {
         return jdbc.sql("""
-                        UPDATE job SET result_text = NULL, user_question = NULL
+                        UPDATE job SET result_text = NULL, user_question = NULL, about = NULL
                         WHERE created_at < :before AND send_state NOT IN ('NOT_SENT', 'CARRIED', 'WAITING_NEXT', 'SENDING_REPLY')
-                          AND (result_text IS NOT NULL OR user_question IS NOT NULL)
+                          AND (result_text IS NOT NULL OR user_question IS NOT NULL OR about IS NOT NULL)
                         """)
                 .param("before", createdBefore)
                 .update();
