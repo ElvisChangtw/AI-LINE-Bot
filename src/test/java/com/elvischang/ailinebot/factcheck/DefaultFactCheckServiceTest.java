@@ -319,11 +319,16 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
     }
 
     @Test
-    void askingForMaterialThatWasQuotedIsAnInvalidModelOutput() {
+    void askingForMaterialItAlreadyHasSaysItCannotOpenItInsteadOfAskingToQuote() {
         when(checker.check(any())).thenReturn(answer(ReplyMode.NEED_MATERIAL));
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ask(text("Cg1", "1", "按1 手機被屏蔽"), "這是真的嗎"))
-                .isInstanceOf(InvalidModelOutputException.class);
+        FactCheckReply reply = ask(text("Cg1", "1", "https://www.youtube.com/watch?v=EvU4PxdM0pI"), "這種常見嗎 影片的");
+
+        assertThat(reply.text()).isEqualTo(BotReplies.CANNOT_SEE_MATERIAL);
+        ArgumentCaptor<FactCheckInput> input = ArgumentCaptor.forClass(FactCheckInput.class);
+        verify(checker).check(input.capture());
+        assertThat(input.getValue().materialText()).isEqualTo("https://www.youtube.com/watch?v=EvU4PxdM0pI\n\n"
+                + DefaultFactCheckService.UNWATCHED_YOUTUBE);
     }
 
     @Test

@@ -41,6 +41,7 @@ public class DefaultFactCheckService implements FactCheckService {
     static final String VOICE_LABEL = "（語音訊息轉成的文字）\n";
     static final String VIDEO_LABEL = "（影片的語音轉成的文字，圖片是影片裡的畫面，通常是從頭到尾平均取的 6 個畫面拼成一張）\n";
     static final String VIDEO_NO_FRAME_LABEL = "（影片的語音轉成的文字）\n";
+    static final String UNWATCHED_YOUTUBE = "（這支 YouTube 影片沒辦法看到內容，請用網址搜尋影片標題、說明和相關新聞來查證）";
     static final String VIDEO_FRAME_ONLY_LABEL = "（影片裡沒有聽到說話，只附影片裡的畫面，通常是從頭到尾平均取的 6 個畫面拼成一張）\n";
     private static final Pattern SCHEME_AND_WWW = Pattern.compile("^(https?://)?(www\\.)?", Pattern.CASE_INSENSITIVE);
     private static final Pattern WHITESPACE = Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS);
@@ -105,7 +106,8 @@ public class DefaultFactCheckService implements FactCheckService {
         // With material we check its video, so a link in the question cannot pull in an unrelated one.
         Optional<String> videoId = material != null ? YouTubeLinks.firstVideoId(material) : YouTubeLinks.firstVideoId(userQuestion);
         Optional<String> watched = videoId.flatMap(youTube::summary);
-        String text = watched.map(s -> (material == null ? "" : material + "\n\n") + youTube.label() + s).orElse(material);
+        String text = watched.map(s -> (material == null ? "" : material + "\n\n") + youTube.label() + s)
+                .orElse(videoId.isPresent() && material != null ? material + "\n\n" + UNWATCHED_YOUTUBE : material);
         // The watched video counts as opened even though web search never fetched the page; other links still count.
         List<String> links = links(material, userQuestion).stream()
                 .filter(link -> watched.isEmpty() || !YouTubeLinks.videoIdOf(link).equals(videoId))
@@ -133,8 +135,10 @@ public class DefaultFactCheckService implements FactCheckService {
             log.warn("factcheck refused groupHash={} reason=out_of_credit", Hashes.shortHash(groupId));
             return FactCheckReply.notice(BotReplies.OUT_OF_CREDIT);
         }
+        // The model had the message but could not use it (a video it cannot watch); asking to quote it again would loop.
         if (check.result().mode() == ReplyMode.NEED_MATERIAL && hasMaterial) {
-            throw new InvalidModelOutputException("asked for material that was already sent");
+            log.info("factcheck groupHash={} material unusable", Hashes.shortHash(groupId));
+            return FactCheckReply.notice(BotReplies.CANNOT_SEE_MATERIAL);
         }
         FactCheckResult filtered = CitationFilter.apply(check.result(), check.consultedUrls());
         // Answers go stale (weather, news) and new rumours often get fact-checked hours later, so neither may stick.

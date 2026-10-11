@@ -17,6 +17,7 @@ public final class BotReplies {
     public static final String IMAGE_TOO_LARGE = "這張圖太大了（超過 10MB），請傳小一點的圖。";
     public static final String IMAGINE_NEEDS_PROMPT = "請在 /imagine 後面寫你想畫的內容，例如：/imagine 一隻戴帽子的貓";
     public static final String ASK_TO_QUOTE = "請「引用」你要查的那則訊息，再 @ 我。";
+    public static final String CANNOT_SEE_MATERIAL = "這則訊息裡的內容（例如影片）我打不開 😅 可以打字說一下它在講什麼，我再幫你查。";
     public static final String JOB_FAILED = "這題我卡住了，再問我一次好嗎？";
     public static final String QUOTA_EXCEEDED = "今天的額度被大家問光了，我先去充電，明天見 🔋";
     public static final String OUT_OF_CREDIT = "AskBot 沒電了，請叫 Elvis 加值 🔋";
