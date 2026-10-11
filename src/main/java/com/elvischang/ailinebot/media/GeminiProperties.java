@@ -15,7 +15,14 @@ public record GeminiProperties(
         long inputMicroUsdPerMillion,
         long outputMicroUsdPerMillion,
         int maxOutputTokens,
-        Duration summaryTtl) {
+        Duration summaryTtl,
+        Duration failureTtl,
+        Duration connectTimeout) {
+
+    // A key pasted with a trailing newline would otherwise break the request header.
+    public GeminiProperties {
+        apiKey = apiKey == null ? null : apiKey.strip();
+    }
 
     public boolean enabled() {
         return apiKey != null && !apiKey.isBlank();

@@ -41,7 +41,6 @@ public class DefaultFactCheckService implements FactCheckService {
     static final String VOICE_LABEL = "（語音訊息轉成的文字）\n";
     static final String VIDEO_LABEL = "（影片的語音轉成的文字，圖片是影片裡的畫面，通常是從頭到尾平均取的 6 個畫面拼成一張）\n";
     static final String VIDEO_NO_FRAME_LABEL = "（影片的語音轉成的文字）\n";
-    static final String YOUTUBE_LABEL = "（以下是另一個 AI 看過訊息裡那支 YouTube 影片後整理的內容；超過 10 分鐘的影片只看了前 10 分鐘）\n";
     static final String VIDEO_FRAME_ONLY_LABEL = "（影片裡沒有聽到說話，只附影片裡的畫面，通常是從頭到尾平均取的 6 個畫面拼成一張）\n";
     private static final Pattern SCHEME_AND_WWW = Pattern.compile("^(https?://)?(www\\.)?", Pattern.CASE_INSENSITIVE);
     private static final Pattern WHITESPACE = Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS);
@@ -103,11 +102,13 @@ public class DefaultFactCheckService implements FactCheckService {
     private FactCheckReply check(String groupId, String material, byte[] image, String imageSha256, String userQuestion,
                                  String conversation) {
         boolean hasMaterial = material != null || image != null;
-        Optional<String> watched = YouTubeLinks.firstVideoId(material, userQuestion).flatMap(youTube::summary);
-        String text = watched.map(s -> (material == null ? "" : material + "\n\n") + YOUTUBE_LABEL + s).orElse(material);
-        // A watched video counts as opened even though web search never fetched the page.
+        // With material we check its video, so a link in the question cannot pull in an unrelated one.
+        Optional<String> videoId = material != null ? YouTubeLinks.firstVideoId(material) : YouTubeLinks.firstVideoId(userQuestion);
+        Optional<String> watched = videoId.flatMap(youTube::summary);
+        String text = watched.map(s -> (material == null ? "" : material + "\n\n") + youTube.label() + s).orElse(material);
+        // The watched video counts as opened even though web search never fetched the page; other links still count.
         List<String> links = links(material, userQuestion).stream()
-                .filter(link -> watched.isEmpty() || !YouTubeLinks.isYouTube(link))
+                .filter(link -> watched.isEmpty() || !YouTubeLinks.videoIdOf(link).equals(videoId))
                 .toList();
         long now = clock.millis();
         String key = cacheKey(userQuestion, text, imageSha256);

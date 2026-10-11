@@ -278,15 +278,20 @@ class DefaultFactCheckServiceTest extends IntegrationTestSupport {
     @Test
     void aYouTubeLinkIsCheckedFromWhatGeminiSawInTheVideo() {
         when(youTube.summary("dQw4w9WgXcQ")).thenReturn(java.util.Optional.of("講者說喝熱檸檬水可以殺死癌細胞"));
+        when(youTube.label()).thenReturn("（影片整理）\n");
         answerWithResult();
 
-        FactCheckReply reply = ask(text("Cg1", "1", "快看 https://youtu.be/dQw4w9WgXcQ"), "");
+        FactCheckReply watched = ask(text("Cg1", "1", "快看 https://youtu.be/dQw4w9WgXcQ"), "https://youtu.be/zzzzzzzzzzz");
+        FactCheckReply secondVideo = ask(text("Cg1", "2", "https://youtu.be/dQw4w9WgXcQ 和 https://youtu.be/yyyyyyyyyyy"), "");
 
         ArgumentCaptor<FactCheckInput> input = ArgumentCaptor.forClass(FactCheckInput.class);
-        verify(checker).check(input.capture());
-        assertThat(input.getValue().materialText()).isEqualTo("快看 https://youtu.be/dQw4w9WgXcQ\n\n"
-                + DefaultFactCheckService.YOUTUBE_LABEL + "講者說喝熱檸檬水可以殺死癌細胞");
-        assertThat(reply.text()).doesNotContain(BotReplies.LINK_NOT_OPENED);
+        verify(checker, times(2)).check(input.capture());
+        assertThat(input.getAllValues().getFirst().materialText())
+                .isEqualTo("快看 https://youtu.be/dQw4w9WgXcQ\n\n（影片整理）\n講者說喝熱檸檬水可以殺死癌細胞");
+        verify(youTube, times(2)).summary("dQw4w9WgXcQ");
+        assertThat(watched.text()).as("the question's link was web-search material, not opened")
+                .contains(BotReplies.LINK_NOT_OPENED);
+        assertThat(secondVideo.text()).as("the unwatched second video still counts").contains(BotReplies.LINK_NOT_OPENED);
     }
 
     @Test

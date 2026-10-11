@@ -24,8 +24,10 @@ public final class YouTubeLinks {
                 .findFirst();
     }
 
-    public static boolean isYouTube(String url) {
-        return VIDEO.matcher(url).find();
+    // Only a link that is itself a YouTube link, not one that merely carries one in its query.
+    public static Optional<String> videoIdOf(String url) {
+        Matcher m = VIDEO.matcher(url);
+        return m.lookingAt() ? Optional.of(m.group(1)) : Optional.empty();
     }
 
     public static String watchUrl(String videoId) {

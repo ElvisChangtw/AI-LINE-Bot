@@ -8,17 +8,24 @@ import java.util.Optional;
 @Repository
 public class VideoSummaryRepository {
 
+    // An empty summary records that the video could not be watched.
+    public record Saved(String summary, long createdAt) {
+
+        public boolean failed() {
+            return summary.isEmpty();
+        }
+    }
+
     private final JdbcClient jdbc;
 
     public VideoSummaryRepository(JdbcClient jdbc) {
         this.jdbc = jdbc;
     }
 
-    public Optional<String> find(String videoId, long notBefore) {
-        return jdbc.sql("SELECT summary FROM video_summary WHERE video_id = :id AND created_at >= :since")
+    public Optional<Saved> find(String videoId) {
+        return jdbc.sql("SELECT summary, created_at FROM video_summary WHERE video_id = :id")
                 .param("id", videoId)
-                .param("since", notBefore)
-                .query(String.class)
+                .query((rs, n) -> new Saved(rs.getString("summary"), rs.getLong("created_at")))
                 .optional();
     }
 

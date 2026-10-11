@@ -24,12 +24,12 @@ class GeminiLiveSpikeTest {
         String key = System.getenv("GEMINI_API_KEY");
         assumeTrue(key != null && !key.isBlank(), "GEMINI_API_KEY not set");
         VideoSummaryRepository summaries = mock(VideoSummaryRepository.class);
-        when(summaries.find(anyString(), anyLong())).thenReturn(Optional.empty());
+        when(summaries.find(anyString())).thenReturn(Optional.empty());
         UsageGuard guard = mock(UsageGuard.class);
         when(guard.allows(anyLong())).thenReturn(true);
         GeminiProperties props = new GeminiProperties(key, "https://generativelanguage.googleapis.com/v1beta",
-                "gemini-3.5-flash-lite", Duration.ofMinutes(10), Duration.ofSeconds(120), 300_000, 2_500_000, 4096,
-                Duration.ofDays(7));
+                "gemini-3.5-flash-lite", Duration.ofMinutes(10), Duration.ofSeconds(30), 300_000, 2_500_000, 8192,
+                Duration.ofDays(7), Duration.ofMinutes(30), Duration.ofSeconds(5));
         YouTubeWatcher watcher = new YouTubeWatcher(props, summaries, guard, mock(SpendRepository.class),
                 java.time.Clock.systemUTC());
 

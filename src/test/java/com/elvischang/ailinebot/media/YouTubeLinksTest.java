@@ -25,5 +25,7 @@ class YouTubeLinksTest {
         assertThat(YouTubeLinks.firstVideoId(null, "https://notyoutube.com/watch?v=dQw4w9WgXcQ",
                 "https://youtu.be/short", "https://www.youtube.com/watch?v=dQw4w9WgXcQextra")).isEmpty();
         assertThat(YouTubeLinks.firstVideoId(null, "問題沒有連結", "https://youtu.be/dQw4w9WgXcQ")).contains("dQw4w9WgXcQ");
+        assertThat(YouTubeLinks.videoIdOf("https://www.google.com/url?q=https://youtu.be/dQw4w9WgXcQ")).isEmpty();
+        assertThat(YouTubeLinks.videoIdOf("https://youtu.be/dQw4w9WgXcQ?si=x")).contains("dQw4w9WgXcQ");
     }
 }
