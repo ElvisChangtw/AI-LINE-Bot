@@ -106,10 +106,19 @@ public class ReplySender {
     }
 
     private void toWaiting(Job carrier, List<Job> deliverables, long now) {
+        // A welcome posted hours later under someone's chat reads like a glitch, so it goes out on joining or never.
+        if (isJoinNotice(carrier)) {
+            jobs.setSendState(deliverables.stream().map(Job::id).toList(), SendState.EXPIRED);
+            return;
+        }
         jobs.markWaiting(deliverables.stream().map(Job::id).toList(), now);
         if (carrier.kind() == JobKind.DELIVERY) {
             jobs.setSendState(List.of(carrier.id()), SendState.NOTHING_TO_SEND);
         }
+    }
+
+    private static boolean isJoinNotice(Job job) {
+        return job.kind() == JobKind.NOTICE && job.triggerMessageId() == null;
     }
 
     private static boolean isImage(Job job) {

@@ -115,6 +115,26 @@ class ReplySenderTest extends IntegrationTestSupport {
     }
 
     @Test
+    void aJoinNoticeThatCannotGoOutNowIsDroppedInsteadOfPostedUnderSomeoneElsesMessage() {
+        stubRejected(1, false);
+        long now = clock.millis();
+        String rejected = jobs.insert(new NewJob(JobKind.NOTICE, "Cg1", null, null, null, "rt-1", null, BotReplies.JOIN_NOTICE), now);
+        String late = jobs.insert(new NewJob(JobKind.NOTICE, "Cg1", null, null, null, "rt-2", null, BotReplies.JOIN_NOTICE), now);
+        for (String id : List.of(rejected, late)) {
+            jobs.claim(id, now, 60_000);
+            jobs.complete(id, BotReplies.JOIN_NOTICE, now, 1);
+        }
+
+        sender.send(rejected);
+        clock.advance(Duration.ofSeconds(46));
+        sender.send(late);
+
+        assertThat(state(rejected)).isEqualTo(SendState.EXPIRED);
+        assertThat(state(late)).isEqualTo(SendState.EXPIRED);
+        assertThat(jobs.hasWaiting("Cg1", 0)).isFalse();
+    }
+
+    @Test
     void marksUnknownAndDoesNotRetryWhenTheResultIsUnclear() {
         LINE.stubFor(post(urlEqualTo(REPLY)).willReturn(aResponse().withStatus(200).withFixedDelay(3000)));
         String id = finished(JobKind.FACT_CHECK, "qt-100", "結果", "rt-1");
