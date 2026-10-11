@@ -28,7 +28,7 @@ class GeminiLiveSpikeTest {
         UsageGuard guard = mock(UsageGuard.class);
         when(guard.allows(anyLong())).thenReturn(true);
         GeminiProperties props = new GeminiProperties(key, "https://generativelanguage.googleapis.com/v1beta",
-                "gemini-3.5-flash-lite", Duration.ofMinutes(10), Duration.ofSeconds(30), 300_000, 2_500_000, 8192,
+                "gemini-3.8-flash", Duration.ofMinutes(10), Duration.ofSeconds(30), 750_000, 3_750_000, 8192,
                 Duration.ofDays(7), Duration.ofMinutes(30), Duration.ofSeconds(5));
         YouTubeWatcher watcher = new YouTubeWatcher(props, summaries, guard, mock(SpendRepository.class),
                 java.time.Clock.systemUTC());

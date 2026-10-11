@@ -58,13 +58,13 @@ bot:
 gemini:
   api-key: ${GEMINI_API_KEY:}
   base-url: https://generativelanguage.googleapis.com/v1beta
-  model: gemini-3.5-flash-lite
+  model: gemini-3.8-flash
   max-clip: 10m
   # Short enough that a stuck video cannot hold one of the two job threads for long.
   request-timeout: 30s
   connect-timeout: 5s
-  input-micro-usd-per-million: 300000
-  output-micro-usd-per-million: 2500000
+  input-micro-usd-per-million: 750000
+  output-micro-usd-per-million: 3750000
   max-output-tokens: 8192
   summary-ttl: 7d
   failure-ttl: 30m
